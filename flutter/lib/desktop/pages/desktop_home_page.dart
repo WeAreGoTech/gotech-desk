@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
+import '../widgets/gotech_home.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -59,6 +60,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    if (bind.isCustomClient() && !isIncomingOnly) {
+      return _buildBlock(child: buildGoTechHome(context));
+    }
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,6 +178,27 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               )
           ],
         ),
+      ),
+    );
+  }
+
+  Widget buildGoTechHome(BuildContext context) {
+    final isOutgoingOnly = bind.isOutgoingOnly();
+    final header = Column(
+      children: [
+        if (!isOutgoingOnly) buildPresetPasswordWarning(),
+        loadPowered(context),
+        loadLogo(),
+        const SizedBox(height: 14),
+        if (!isOutgoingOnly) const GoTechDeviceCard(),
+        Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+      ],
+    );
+    return ChangeNotifierProvider.value(
+      value: gFFI.serverModel,
+      child: Container(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: ConnectionPage(header: header),
       ),
     );
   }
@@ -597,6 +622,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
 
+    if (bind.isCustomClient() && !bind.isIncomingOnly()) {
+      return GoTechNoticeCard(
+        title: title,
+        content: content,
+        btnText: btnText,
+        onPressed: onPressed,
+        help: help,
+        onHelp: link == null ? null : () => launchUrl(Uri.parse(link)),
+        onClose: closeButton == true ? closeCard : null,
+      );
+    }
     return Stack(
       children: [
         Container(

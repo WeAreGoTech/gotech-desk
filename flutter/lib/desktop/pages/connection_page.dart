@@ -20,6 +20,7 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
+import '../../desktop/widgets/gotech_home.dart';
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
@@ -189,7 +190,10 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
 /// Connection page for connecting to a remote peer.
 class ConnectionPage extends StatefulWidget {
-  const ConnectionPage({Key? key}) : super(key: key);
+  const ConnectionPage({Key? key, this.header}) : super(key: key);
+
+  /// Shown above the connect bar in the GoTech layout.
+  final Widget? header;
 
   @override
   State<ConnectionPage> createState() => _ConnectionPageState();
@@ -304,6 +308,9 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   Widget build(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
+    if (bind.isCustomClient()) {
+      return _buildGoTech(context, isOutgoingOnly);
+    }
     return Column(
       children: [
         Expanded(
@@ -343,20 +350,8 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// UI for the remote ID TextField.
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
-    var w = Container(
-      width: 320 + 20 * 2,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
-      decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(13)),
-          border: Border.all(color: Theme.of(context).colorScheme.background)),
-      child: Ink(
-        child: Column(
-          children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
-            Row(
-              children: [
-                Expanded(
-                    child: RawAutocomplete<Peer>(
+    final goTech = bind.isCustomClient();
+    final idField = RawAutocomplete<Peer>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
                     if (textEditingValue.text == '') {
                       _autocompleteOpts = const Iterable<Peer>.empty();
@@ -419,15 +414,17 @@ class _ConnectionPageState extends State<ConnectionPage>
                           enableSuggestions: false,
                           keyboardType: TextInputType.visiblePassword,
                           focusNode: fieldFocusNode,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'WorkSans',
-                            fontSize: 22,
-                            height: 1.4,
+                            fontSize: goTech ? 20 : 22,
+                            height: goTech ? 1.2 : 1.4,
                           ),
                           maxLines: 1,
                           cursorColor:
                               Theme.of(context).textTheme.titleLarge?.color,
-                          decoration: InputDecoration(
+                          decoration: goTech
+                              ? _goTechInputDecoration(context)
+                              : InputDecoration(
                               filled: false,
                               counterText: '',
                               hintText: _idInputFocused.value
@@ -512,28 +509,33 @@ class _ConnectionPageState extends State<ConnectionPage>
                               ))),
                     );
                   },
-                )),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 13.0),
-              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                SizedBox(
-                  height: 28.0,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      onConnect();
-                    },
-                    child: Text(translate("Connect")),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  height: 28.0,
-                  width: 28.0,
+                );
+    final connectButton = SizedBox(
+      height: goTech ? 48.0 : 28.0,
+      child: ElevatedButton(
+        style: goTech
+            ? ElevatedButton.styleFrom(
+                backgroundColor: kGoTechRed,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)))
+            : null,
+        onPressed: () {
+          onConnect();
+        },
+        child: Text(translate("Connect"),
+            style: goTech
+                ? const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)
+                : null),
+      ),
+    );
+    final moreButton = Container(
+                  height: goTech ? 48.0 : 28.0,
+                  width: goTech ? 48.0 : 28.0,
                   decoration: BoxDecoration(
                     border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(goTech ? 12 : 8),
                   ),
                   child: Center(
                     child: StatefulBuilder(
@@ -613,7 +615,39 @@ class _ConnectionPageState extends State<ConnectionPage>
                       },
                     ),
                   ),
-                ),
+                );
+    if (goTech) {
+      return Row(
+        children: [
+          Expanded(child: idField),
+          const SizedBox(width: 10),
+          connectButton,
+          const SizedBox(width: 8),
+          moreButton,
+        ],
+      );
+    }
+    var w = Container(
+      width: 320 + 20 * 2,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+      decoration: BoxDecoration(
+          borderRadius: const BorderRadius.all(Radius.circular(13)),
+          border: Border.all(color: Theme.of(context).colorScheme.background)),
+      child: Ink(
+        child: Column(
+          children: [
+            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
+            Row(
+              children: [
+                Expanded(child: idField),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 13.0),
+              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                connectButton,
+                const SizedBox(width: 8),
+                moreButton,
               ]),
             ),
           ],
@@ -622,5 +656,52 @@ class _ConnectionPageState extends State<ConnectionPage>
     );
     return Container(
         constraints: const BoxConstraints(maxWidth: 600), child: w);
+  }
+
+  InputDecoration _goTechInputDecoration(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide:
+          BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.15)),
+    );
+    return InputDecoration(
+      filled: true,
+      fillColor: Theme.of(context).cardColor,
+      counterText: '',
+      hintText: _idInputFocused.value ? null : translate('Enter Remote ID'),
+      prefixIcon: const Icon(Icons.desktop_windows_outlined, size: 20),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+          borderSide: const BorderSide(color: kGoTechRed, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+
+  Widget _buildGoTech(BuildContext context, bool isOutgoingOnly) {
+    return Column(
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: kGoTechContentWidth),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  if (widget.header != null) widget.header!,
+                  const SizedBox(height: 16),
+                  _buildRemoteIDTextField(context),
+                  const SizedBox(height: 22),
+                  Expanded(child: PeerTabPage()),
+                ],
+              ).paddingSymmetric(horizontal: 24),
+            ),
+          ),
+        ),
+        if (!isOutgoingOnly) const Divider(height: 1),
+        if (!isOutgoingOnly) OnlineStatusWidget(),
+      ],
+    );
   }
 }
