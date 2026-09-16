@@ -12,8 +12,9 @@ import 'package:get/get.dart';
 
 import 'gotech_home.dart';
 
-// TODO(gotech): replace with the production website URL once deployed.
-const kGoTechApiBase = 'http://localhost:3000';
+// Temporary sslip.io address until GoTech has a domain.
+const kGoTechApiBase =
+    'https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io';
 
 const kOptionGoTechApiUrl = 'gotech-api-url';
 const kOptionGoTechCustomerCode = 'gotech-customer-code';
