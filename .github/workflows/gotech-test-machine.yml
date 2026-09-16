@@ -1,0 +1,85 @@
+name: GoTech Desk test Windows machine
+
+# Spins up a throwaway Windows runner with GoTech Desk installed and registered
+# to a customer number, so the panel's connect flow can be tested without a PC.
+on:
+  workflow_dispatch:
+    inputs:
+      customer_code:
+        description: "Müşteri numarası"
+        default: "799990"
+        required: true
+      minutes:
+        description: "Açık kalma süresi (dakika)"
+        default: "45"
+        required: true
+      installer_url:
+        description: "MSI adresi"
+        default: "https://github.com/grxtor/gotech-desk/releases/download/gotech-1.5.0-test1/GoTechDesk-1.5.0-x86_64.msi"
+        required: true
+
+env:
+  PANEL_URL: "https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io"
+
+jobs:
+  test-machine:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Install GoTech Desk
+        run: |
+          Invoke-WebRequest -Uri "${{ inputs.installer_url }}" -OutFile gotech.msi
+          $p = Start-Process msiexec.exe -ArgumentList '/i gotech.msi /qn /norestart /l*v msi.log' -Wait -PassThru
+          Write-Output "msiexec exit code: $($p.ExitCode)"
+          Get-ChildItem "C:\Program Files\GoTechDesk" | Select-Object -First 10
+          Get-Service | Where-Object { $_.Name -like "*GoTech*" } | Format-Table -AutoSize
+
+      - name: Start service and read ID
+        run: |
+          $exe = "C:\Program Files\GoTechDesk\GoTechDesk.exe"
+          Start-Service -Name GoTechDesk -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 30
+          $id = ""
+          for ($i = 0; $i -lt 12 -and -not $id; $i++) {
+            $id = (& $exe --get-id | Out-String).Trim()
+            if (-not $id) { Start-Sleep -Seconds 10 }
+          }
+          if (-not $id) { Write-Error "Could not read GoTech Desk ID"; exit 1 }
+          Write-Output "GoTech Desk ID: $id"
+          "DESK_ID=$id" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Set unattended password and register to panel
+        run: |
+          $exe = "C:\Program Files\GoTechDesk\GoTechDesk.exe"
+          $chars = [char[]]'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+          $pw = -join (1..20 | ForEach-Object { $chars | Get-Random })
+          & $exe --password $pw | Out-Null
+          Start-Sleep -Seconds 5
+          $body = @{
+            customerCode = "${{ inputs.customer_code }}"
+            deskId = $env:DESK_ID
+            hostname = "BULUT-TEST-PC"
+            platform = "windows"
+            appVersion = "1.5.0"
+            unattendedPassword = $pw
+          } | ConvertTo-Json
+          $resp = Invoke-RestMethod -Method Post -Uri "$env:PANEL_URL/api/desk/register" -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+          Write-Output "Panel: $($resp | ConvertTo-Json -Compress)"
+
+      - name: Keep machine online
+        run: |
+          $end = (Get-Date).AddMinutes([int]"${{ inputs.minutes }}")
+          while ((Get-Date) -lt $end) {
+            $left = [int](($end - (Get-Date)).TotalMinutes)
+            Write-Output "$(Get-Date -Format HH:mm) ID $env:DESK_ID açık, kalan ~$left dk"
+            Start-Sleep -Seconds 60
+          }
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-machine-logs
+          path: |
+            msi.log
+            C:\Windows\ServiceProfiles\LocalService\AppData\Roaming\GoTechDesk\log\**
