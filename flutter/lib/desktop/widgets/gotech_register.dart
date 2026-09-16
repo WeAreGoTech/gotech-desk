@@ -13,6 +13,26 @@ const _kOtherPerson = '__other__';
 const _kSharedComputer = '__shared__';
 const _kSupportMessageMaxLength = 2000;
 const _kSupportMessageLines = 5;
+const _kPeopleListMaxHeight = 240.0;
+const _kPeopleListWidth = 440.0;
+
+Widget _whoTile(String title, String value, String? groupValue,
+    ValueChanged<String?>? onChanged, IconData icon) {
+  return RadioListTile<String>(
+    dense: true,
+    value: value,
+    groupValue: groupValue,
+    onChanged: onChanged,
+    activeColor: kGoTechRed,
+    title: Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 8),
+        Expanded(child: Text(title)),
+      ],
+    ),
+  );
+}
 
 void showGoTechRegisterDialog() {
   final codeController = TextEditingController(
@@ -183,21 +203,32 @@ List<Widget> _personStep({
       ],
     ),
     const SizedBox(height: 16),
-    DropdownButtonFormField<String>(
-      value: who,
-      isExpanded: true,
-      decoration:
-          const InputDecoration(labelText: 'Bu bilgisayarı kim kullanıyor?'),
-      items: [
-        ...lookup.people.map((p) =>
-            DropdownMenuItem(value: p.id, child: Text(p.displayName))),
-        const DropdownMenuItem(
-            value: _kOtherPerson, child: Text('Listede adım yok')),
-        const DropdownMenuItem(
-            value: _kSharedComputer,
-            child: Text('Ortak bilgisayar (ör. Resepsiyon)')),
-      ],
-      onChanged: loading ? null : onWho,
+    Text('Bu bilgisayarı kim kullanıyor?',
+            style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.color
+                    ?.withOpacity(0.7)))
+        .marginOnly(bottom: 4),
+    // AlertDialog sizes its content with IntrinsicWidth, which a ListView
+    // cannot answer; a tight width short-circuits that query.
+    Container(
+      width: _kPeopleListWidth,
+      constraints: const BoxConstraints(maxHeight: _kPeopleListMaxHeight),
+      decoration: goTechCardDecoration(context),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          ...lookup.people.map((p) => _whoTile(p.displayName, p.id, who,
+              loading ? null : onWho, Icons.person_outline_rounded)),
+          _whoTile('Listede adım yok', _kOtherPerson, who,
+              loading ? null : onWho, Icons.person_add_alt_rounded),
+          _whoTile('Ortak bilgisayar (ör. Resepsiyon)', _kSharedComputer, who,
+              loading ? null : onWho, Icons.groups_outlined),
+        ],
+      ),
     ),
     if (who == _kOtherPerson)
       TextField(
