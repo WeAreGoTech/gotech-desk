@@ -25,6 +25,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
 import '../widgets/gotech_home.dart';
+import '../widgets/gotech_register.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -191,6 +192,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         loadLogo(),
         const SizedBox(height: 14),
         if (!isOutgoingOnly) const GoTechDeviceCard(),
+        if (!isOutgoingOnly) const GoTechRegistrationBar(),
         Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
       ],
     );
@@ -731,6 +733,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    if (bind.isCustomClient() && !bind.isIncomingOnly() && !bind.isOutgoingOnly()) {
+      GoTechRegistration.load();
+      if (GoTechRegistration.shouldPrompt) {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => showGoTechRegisterDialog());
+      }
+    }
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
