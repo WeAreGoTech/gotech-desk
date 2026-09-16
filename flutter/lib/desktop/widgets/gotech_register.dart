@@ -1,148 +1,77 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
-import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:get/get.dart';
 
+import 'gotech_api.dart';
 import 'gotech_home.dart';
 
-// Temporary sslip.io address until GoTech has a domain.
-const kGoTechApiBase =
-    'https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io';
+export 'gotech_api.dart' show GoTechRegistration, goTechHeartbeat;
 
-const kOptionGoTechApiUrl = 'gotech-api-url';
-const kOptionGoTechCustomerCode = 'gotech-customer-code';
-const kOptionGoTechCompanyName = 'gotech-company-name';
-const kOptionGoTechUnattended = 'gotech-unattended';
-const kOptionGoTechRegisterSkipped = 'gotech-register-skipped';
-
-const _kCustomerCodeLength = 6;
-const _kUnattendedPasswordLength = 20;
-const _kPasswordChars =
-    'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const _kRequestTimeout = Duration(seconds: 15);
-
-/// Registration state shown on the home page.
-class GoTechRegistration {
-  static final customerCode = ''.obs;
-  static final companyName = ''.obs;
-
-  static void load() {
-    customerCode.value = bind.mainGetLocalOption(key: kOptionGoTechCustomerCode);
-    companyName.value = bind.mainGetLocalOption(key: kOptionGoTechCompanyName);
-  }
-
-  static bool get isRegistered => customerCode.value.isNotEmpty;
-
-  static bool get shouldPrompt =>
-      !isRegistered &&
-      bind.mainGetLocalOption(key: kOptionGoTechRegisterSkipped) != 'Y';
-}
-
-String goTechApiBase() {
-  final custom = bind.mainGetLocalOption(key: kOptionGoTechApiUrl).trim();
-  return custom.isNotEmpty ? custom : kGoTechApiBase;
-}
-
-String _generatePassword() {
-  final random = Random.secure();
-  return List.generate(_kUnattendedPasswordLength,
-      (_) => _kPasswordChars[random.nextInt(_kPasswordChars.length)]).join();
-}
-
-/// Registers this device to the customer on the GoTech website.
-/// Returns an error message, or null on success.
-Future<String?> goTechRegister(
-    {required String customerCode, required bool unattended}) async {
-  final wasUnattended =
-      bind.mainGetLocalOption(key: kOptionGoTechUnattended) == 'Y';
-  final password = unattended ? _generatePassword() : null;
-  if (password != null || wasUnattended) {
-    final ok = await bind.mainSetPermanentPasswordWithResult(
-        password: password ?? '');
-    if (!ok) return 'Kalıcı şifre ayarlanamadı.';
-  }
-
-  Future<void> revertPassword() async {
-    if (password != null && !wasUnattended) {
-      await bind.mainSetPermanentPasswordWithResult(password: '');
-    }
-  }
-
-  try {
-    final deskId = (await bind.mainGetMyId()).replaceAll(' ', '');
-    final resp = await http
-        .post(
-          Uri.parse('${goTechApiBase()}/api/desk/register'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'customerCode': customerCode,
-            'deskId': deskId,
-            'hostname': Platform.localHostname,
-            'platform': Platform.operatingSystem,
-            'appVersion': await bind.mainGetVersion(),
-            'unattendedPassword': password,
-          }),
-        )
-        .timeout(_kRequestTimeout);
-    final body = jsonDecode(resp.body);
-    if (resp.statusCode == 200 && body is Map && body['ok'] == true) {
-      final companyName = body['companyName']?.toString() ?? '';
-      await bind.mainSetLocalOption(
-          key: kOptionGoTechCustomerCode, value: customerCode);
-      await bind.mainSetLocalOption(
-          key: kOptionGoTechCompanyName, value: companyName);
-      await bind.mainSetLocalOption(
-          key: kOptionGoTechUnattended, value: unattended ? 'Y' : '');
-      GoTechRegistration.load();
-      return null;
-    }
-    await revertPassword();
-    if (body is Map && body['error'] is String) return body['error'];
-    return 'Kayıt başarısız (${resp.statusCode}).';
-  } catch (e) {
-    debugPrint('GoTech register failed: $e');
-    await revertPassword();
-    return 'GoTech sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.';
-  }
-}
+const _kOtherPerson = '__other__';
+const _kSharedComputer = '__shared__';
+const _kSupportMessageMaxLength = 2000;
+const _kSupportMessageLines = 5;
 
 void showGoTechRegisterDialog() {
   final codeController = TextEditingController(
       text: bind.mainGetLocalOption(key: kOptionGoTechCustomerCode));
+  final nameController = TextEditingController();
+  final labelController = TextEditingController();
   var unattended = bind.mainGetLocalOption(key: kOptionGoTechUnattended) == 'Y';
+  GoTechLookup? lookup;
+  String? who;
   var errMsg = '';
   var loading = false;
 
   gFFI.dialogManager.show((setState, close, context) {
-    Future<void> submit() async {
+    Future<void> run(Future<String?> Function() task) async {
       if (loading) return;
-      final code = codeController.text.trim();
-      if (code.length != _kCustomerCodeLength) {
-        setState(() => errMsg = 'Müşteri numarası 6 haneli olmalıdır.');
-        return;
-      }
       setState(() {
         loading = true;
         errMsg = '';
       });
-      final err =
-          await goTechRegister(customerCode: code, unattended: unattended);
-      if (err != null) {
-        setState(() {
-          loading = false;
-          errMsg = err;
-        });
-        return;
+      final err = await task();
+      setState(() {
+        loading = false;
+        errMsg = err ?? '';
+      });
+    }
+
+    Future<String?> findCompany() async {
+      final code = codeController.text.trim();
+      if (code.length != kGoTechCompanyCodeLength) {
+        return 'Firma kodu 6 haneli olmalıdır.';
       }
-      close();
-      showToast('${GoTechRegistration.companyName.value} olarak kaydedildi');
+      final result = await goTechLookup(code);
+      if (result.error != null) return result.error;
+      lookup = result.value;
+      who = null;
+      return null;
+    }
+
+    Future<String?> save() async {
+      if (who == null) return 'Bu bilgisayarı kimin kullandığını seçin.';
+      final name = nameController.text.trim();
+      final label = labelController.text.trim();
+      if (who == _kOtherPerson && name.length < 2) return 'Adınızı yazın.';
+      if (who == _kSharedComputer && label.isEmpty) {
+        return 'Bilgisayar için bir ad yazın (ör. Resepsiyon).';
+      }
+      final err = await goTechRegister(
+        customerCode: codeController.text.trim(),
+        unattended: unattended,
+        personId: who == _kOtherPerson || who == _kSharedComputer ? null : who,
+        personName: who == _kOtherPerson ? name : null,
+        label: who == _kSharedComputer ? label : null,
+      );
+      if (err == null) {
+        close();
+        showToast(
+            '${GoTechRegistration.companyName.value} olarak kaydedildi');
+      }
+      return err;
     }
 
     void later() {
@@ -153,6 +82,7 @@ void showGoTechRegisterDialog() {
       close();
     }
 
+    final step2 = lookup != null;
     return CustomAlertDialog(
       title: Row(
         children: [
@@ -164,49 +94,207 @@ void showGoTechRegisterDialog() {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-              'GoTech ekibinin size uzaktan destek verebilmesi için müşteri '
-              'numaranızı girin. Numaranızı GoTech müşteri panelinde '
-              '"Uzak Destek" sayfasında bulabilirsiniz.'),
-          const SizedBox(height: 16),
+          if (!step2) ..._companyStep(codeController, loading, errMsg,
+              () => run(findCompany)),
+          if (step2)
+            ..._personStep(
+              context: context,
+              lookup: lookup!,
+              who: who,
+              onWho: (v) => setState(() => who = v),
+              nameController: nameController,
+              labelController: labelController,
+              unattended: unattended,
+              onUnattended: (v) => setState(() => unattended = v),
+              loading: loading,
+              errMsg: errMsg,
+            ),
+          if (loading) const LinearProgressIndicator().marginOnly(top: 8),
+        ],
+      ),
+      actions: step2
+          ? [
+              dialogButton('Geri',
+                  onPressed: () => setState(() {
+                        lookup = null;
+                        errMsg = '';
+                      }),
+                  isOutline: true),
+              dialogButton('Kaydet', onPressed: () => run(save)),
+            ]
+          : [
+              dialogButton('Şimdi değil', onPressed: later, isOutline: true),
+              dialogButton('Devam', onPressed: () => run(findCompany)),
+            ],
+      onSubmit: () => run(step2 ? save : findCompany),
+      onCancel: later,
+    );
+  });
+}
+
+List<Widget> _companyStep(TextEditingController controller, bool loading,
+    String errMsg, VoidCallback onSubmit) {
+  return [
+    const Text('GoTech ekibinin size uzaktan destek verebilmesi için firma '
+        'kodunuzu girin. Kodu firma yetkilinizden veya GoTech müşteri '
+        'panelindeki "Uzak Destek" sayfasından öğrenebilirsiniz.'),
+    const SizedBox(height: 16),
+    TextField(
+      controller: controller,
+      autofocus: true,
+      enabled: !loading,
+      maxLength: kGoTechCompanyCodeLength,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: const TextStyle(fontSize: 22, letterSpacing: 4),
+      decoration: InputDecoration(
+        labelText: 'Firma kodu',
+        counterText: '',
+        errorText: errMsg.isEmpty ? null : errMsg,
+        errorMaxLines: 3,
+      ),
+      onSubmitted: (_) => onSubmit(),
+    ),
+  ];
+}
+
+List<Widget> _personStep({
+  required BuildContext context,
+  required GoTechLookup lookup,
+  required String? who,
+  required ValueChanged<String?> onWho,
+  required TextEditingController nameController,
+  required TextEditingController labelController,
+  required bool unattended,
+  required ValueChanged<bool> onUnattended,
+  required bool loading,
+  required String errMsg,
+}) {
+  return [
+    Row(
+      children: [
+        const Icon(Icons.business_rounded, color: Colors.green, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(lookup.companyName,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    DropdownButtonFormField<String>(
+      value: who,
+      isExpanded: true,
+      decoration:
+          const InputDecoration(labelText: 'Bu bilgisayarı kim kullanıyor?'),
+      items: [
+        ...lookup.people.map((p) =>
+            DropdownMenuItem(value: p.id, child: Text(p.displayName))),
+        const DropdownMenuItem(
+            value: _kOtherPerson, child: Text('Listede adım yok')),
+        const DropdownMenuItem(
+            value: _kSharedComputer,
+            child: Text('Ortak bilgisayar (ör. Resepsiyon)')),
+      ],
+      onChanged: loading ? null : onWho,
+    ),
+    if (who == _kOtherPerson)
+      TextField(
+        controller: nameController,
+        enabled: !loading,
+        decoration: const InputDecoration(labelText: 'Adınız ve soyadınız'),
+      ).marginOnly(top: 8),
+    if (who == _kSharedComputer)
+      TextField(
+        controller: labelController,
+        enabled: !loading,
+        maxLength: 60,
+        decoration: const InputDecoration(
+            labelText: 'Bilgisayarın adı', hintText: 'Resepsiyon, Kasa…'),
+      ).marginOnly(top: 8),
+    if (errMsg.isNotEmpty)
+      Text(errMsg, style: const TextStyle(color: kGoTechRed))
+          .marginOnly(top: 8),
+    const SizedBox(height: 8),
+    CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: unattended,
+      onChanged: loading ? null : (v) => onUnattended(v ?? false),
+      title: const Text('Gözetimsiz erişime izin ver'),
+      subtitle: const Text(
+          'GoTech, siz bilgisayar başında olmasanız da bağlanabilir. '
+          'Kapalıysa her bağlantıyı ekranınızda siz onaylarsınız.'),
+    ),
+  ];
+}
+
+void showGoTechSupportDialog() {
+  final messageController = TextEditingController();
+  var errMsg = '';
+  var loading = false;
+
+  gFFI.dialogManager.show((setState, close, context) {
+    Future<void> submit() async {
+      if (loading) return;
+      final message = messageController.text.trim();
+      if (message.isEmpty) {
+        setState(() => errMsg = 'Sorununuzu kısaca yazın.');
+        return;
+      }
+      setState(() {
+        loading = true;
+        errMsg = '';
+      });
+      final result = await goTechSupportRequest(message);
+      if (result.error != null) {
+        setState(() {
+          loading = false;
+          errMsg = result.error!;
+        });
+        return;
+      }
+      close();
+      showToast('Talebiniz alındı (#${result.value}). '
+          'GoTech ekibi en kısa sürede size dönecek.');
+    }
+
+    return CustomAlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.support_agent_rounded, color: kGoTechRed),
+          const Text('GoTech\'ten destek iste').paddingOnly(left: 10),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Sorununuzu yazın. Talebiniz bu bilgisayarla birlikte '
+              'GoTech ekibine iletilir; gerekirse bilgisayarınıza bağlanırlar.'),
+          const SizedBox(height: 12),
           TextField(
-            controller: codeController,
+            controller: messageController,
             autofocus: true,
             enabled: !loading,
-            maxLength: _kCustomerCodeLength,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: const TextStyle(fontSize: 22, letterSpacing: 4),
+            minLines: _kSupportMessageLines,
+            maxLines: _kSupportMessageLines,
+            maxLength: _kSupportMessageMaxLength,
             decoration: InputDecoration(
-              labelText: 'Müşteri numarası',
-              counterText: '',
+              hintText: 'Ör. Yazıcıdan çıktı alamıyorum…',
               errorText: errMsg.isEmpty ? null : errMsg,
               errorMaxLines: 3,
             ),
-            onSubmitted: (_) => submit(),
-          ),
-          const SizedBox(height: 8),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: unattended,
-            onChanged: loading
-                ? null
-                : (v) => setState(() => unattended = v ?? false),
-            title: const Text('Gözetimsiz erişime izin ver'),
-            subtitle: const Text(
-                'GoTech, siz bilgisayar başında olmasanız da bağlanabilir. '
-                'Kapalıysa her bağlantıyı ekranınızda siz onaylarsınız.'),
           ),
           if (loading) const LinearProgressIndicator().marginOnly(top: 8),
         ],
       ),
       actions: [
-        dialogButton('Şimdi değil', onPressed: later, isOutline: true),
-        dialogButton('Kaydet', onPressed: submit),
+        dialogButton('Vazgeç', onPressed: close, isOutline: true),
+        dialogButton('Gönder', onPressed: submit),
       ],
-      onSubmit: submit,
-      onCancel: later,
+      onCancel: close,
     );
   });
 }
@@ -220,9 +308,10 @@ class GoTechRegistrationBar extends StatelessWidget {
     final textColor = Theme.of(context).textTheme.titleLarge?.color;
     return Obx(() {
       final registered = GoTechRegistration.isRegistered;
+      final who = GoTechRegistration.who;
       return Container(
         margin: const EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
         decoration: goTechCardDecoration(context),
         child: Row(
           children: [
@@ -233,21 +322,49 @@ class GoTechRegistrationBar extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                registered
-                    ? '${GoTechRegistration.companyName.value} · '
-                        'Müşteri no ${GoTechRegistration.customerCode.value}'
-                    : 'Bu cihaz henüz bir GoTech müşterisine kayıtlı değil.',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, color: textColor),
-              ),
+              child: registered
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [GoTechRegistration.companyName.value, who]
+                              .where((s) => s.isNotEmpty)
+                              .join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: textColor),
+                        ),
+                        Text(
+                          'Firma kodu ${GoTechRegistration.customerCode.value}',
+                          style: TextStyle(
+                              fontSize: 11, color: textColor?.withOpacity(0.5)),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      'Bu bilgisayar henüz bir GoTech müşterisine kayıtlı değil.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: textColor),
+                    ),
             ),
             TextButton(
               onPressed: showGoTechRegisterDialog,
               style: TextButton.styleFrom(foregroundColor: kGoTechRed),
               child: Text(registered ? 'Değiştir' : 'Kayıt ol'),
             ),
+            if (registered)
+              ElevatedButton.icon(
+                onPressed: showGoTechSupportDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kGoTechRed,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.support_agent_rounded, size: 18),
+                label: const Text('Destek iste'),
+              ).marginOnly(left: 4),
           ],
         ),
       );

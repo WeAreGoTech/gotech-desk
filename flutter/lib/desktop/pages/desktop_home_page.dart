@@ -735,10 +735,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.initState();
     if (bind.isCustomClient() && !bind.isIncomingOnly() && !bind.isOutgoingOnly()) {
       GoTechRegistration.load();
-      if (GoTechRegistration.shouldPrompt) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => showGoTechRegisterDialog());
-      }
+      goTechHeartbeat().then((_) {
+        if (mounted && GoTechRegistration.shouldPrompt) {
+          showGoTechRegisterDialog();
+        }
+      });
     }
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
