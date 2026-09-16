@@ -482,7 +482,7 @@ class _GeneralState extends State<_General> {
   Widget other() {
     final incomingOnly = bind.isIncomingOnly();
     final outgoingOnly = bind.isOutgoingOnly();
-    final showAutoUpdate = (isWindows && bind.mainIsInstalled()) ||
+    final showAutoUpdate = (isWindows && bind.mainIsInstalled() && !bind.isCustomClient()) ||
     (isMacOS && bind.mainIsInstalled() && bind.mainIsInstalledDaemon(prompt: false) && !bind.isCustomClient());
     final children = <Widget>[
       if (!isWeb && !incomingOnly)
@@ -2552,6 +2552,7 @@ class _AboutState extends State<_About> {
               SelectionArea(
                   child: Text('${translate('ID')}: $myId')
                       .marginSymmetric(vertical: 4.0)),
+              if (!bind.isCustomClient())
               InkWell(
                   onTap: () {
                     launchUrlString('https://rustdesk.com/privacy.html');
@@ -2560,6 +2561,7 @@ class _AboutState extends State<_About> {
                     translate('Privacy Statement'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
+              if (!bind.isCustomClient())
               InkWell(
                   onTap: () {
                     launchUrlString('https://rustdesk.com');
@@ -2580,7 +2582,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
+                            'GoTech Desk, based on RustDesk (AGPL-3.0). Source: https://github.com/grxtor/gotech-desk\nCopyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
