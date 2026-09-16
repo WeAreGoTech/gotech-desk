@@ -6,16 +6,24 @@ on:
   workflow_dispatch:
     inputs:
       customer_code:
-        description: "Müşteri numarası"
+        description: "Firma kodu"
         default: "799990"
         required: true
       minutes:
         description: "Açık kalma süresi (dakika)"
         default: "45"
         required: true
+      label:
+        description: "Ortak bilgisayar etiketi (boşsa ilk kişiye bağlanır)"
+        default: ""
+        required: false
+      support_request:
+        description: "Açılışta destek talebi oluştur"
+        default: "true"
+        required: true
       installer_url:
         description: "MSI adresi"
-        default: "https://github.com/grxtor/gotech-desk/releases/download/gotech-1.5.0-test1/GoTechDesk-1.5.0-x86_64.msi"
+        default: "https://github.com/grxtor/gotech-desk/releases/download/gotech-1.5.0-test2/GoTechDesk-1.5.0-x86_64.msi"
         required: true
 
 env:
@@ -55,16 +63,37 @@ jobs:
           $pw = -join (1..20 | ForEach-Object { $chars | Get-Random })
           & $exe --password $pw | Out-Null
           Start-Sleep -Seconds 5
-          $body = @{
+          function Post($path, $obj) {
+            $json = $obj | ConvertTo-Json
+            Invoke-RestMethod -Method Post -Uri "$env:PANEL_URL$path" -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $lookup = Post "/api/desk/lookup" @{ customerCode = "${{ inputs.customer_code }}" }
+          Write-Output "Firma: $($lookup.companyName), kişi sayısı: $($lookup.people.Count)"
+          $reg = @{
             customerCode = "${{ inputs.customer_code }}"
             deskId = $env:DESK_ID
             hostname = "BULUT-TEST-PC"
             platform = "windows"
             appVersion = "1.5.0"
             unattendedPassword = $pw
-          } | ConvertTo-Json
-          $resp = Invoke-RestMethod -Method Post -Uri "$env:PANEL_URL/api/desk/register" -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
-          Write-Output "Panel: $($resp | ConvertTo-Json -Compress)"
+            personId = $null
+            personName = $null
+            label = $null
+          }
+          if ("${{ inputs.label }}") { $reg.label = "${{ inputs.label }}" }
+          elseif ($lookup.people.Count -gt 0) { $reg.personId = $lookup.people[0].id }
+          else { $reg.personName = "Bulut Test Kullanıcısı" }
+          $resp = Post "/api/desk/register" $reg
+          Write-Output "::add-mask::$($resp.deviceToken)"
+          Write-Output "Kayıt: $($resp.companyName) / kişi: $($resp.personName) / etiket: $($resp.label)"
+          "DESK_TOKEN=$($resp.deviceToken)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Open a support ticket from the machine
+        if: ${{ inputs.support_request == 'true' }}
+        run: |
+          $json = @{ deskId = $env:DESK_ID; deviceToken = $env:DESK_TOKEN; message = "Bulut test makinesinden deneme destek talebi." } | ConvertTo-Json
+          $resp = Invoke-RestMethod -Method Post -Uri "$env:PANEL_URL/api/desk/support-request" -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
+          Write-Output "Talep açıldı: #$($resp.ticketNumber)"
 
       - name: Keep machine online
         run: |
