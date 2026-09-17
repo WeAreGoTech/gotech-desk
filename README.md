@@ -42,8 +42,9 @@ ekranınızı bizim görmemizi ve gerekirse sorunu doğrudan çözmemizi sağlar
 
 **Güvenlik**
 
-- Uygulama yalnızca **GoTech'in kayıtlı bilgisayarlarının** bağlanmasına izin verecek
-  şekilde kilitlenebilir; bu açıkken firma kodunuzu bilen biri bile bağlanamaz.
+- Uygulama yalnızca **GoTech'in kayıtlı bilgisayarlarını** kabul edecek şekilde
+  kilitlenebilir. Bu, rastgele birinin karşınıza çıkmasını engeller; tek başına kimlik
+  doğrulaması değildir, asıl korumanız aşağıdaki onay ve parolanızdır.
 - Tüm bağlantı trafiği uçtan uca şifrelenir ve GoTech'in kendi sunucusu üzerinden geçer.
 - Program arka planda kendiliğinden ekranınızı yayınlamaz; her oturum ya sizin onayınızla
   ya da sizinle önceden anlaşılmış kurulum şifresiyle başlar.
