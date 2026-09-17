@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 
 import 'gotech_api.dart';
 import 'gotech_home.dart';
 
-export 'gotech_api.dart' show GoTechRegistration, goTechHeartbeat;
+export 'gotech_api.dart'
+    show GoTechRegistration, GoTechUpdate, goTechHeartbeat, isGoTechCustomerMachine;
 
 const _kOtherPerson = '__other__';
 const _kSharedComputer = '__shared__';
@@ -35,11 +37,14 @@ Widget _whoTile(String title, String value, String? groupValue,
 }
 
 void showGoTechRegisterDialog() {
-  final codeController = TextEditingController(
-      text: bind.mainGetLocalOption(key: kOptionGoTechCustomerCode));
+  final saved = bind.mainGetLocalOption(key: kOptionGoTechCustomerCode);
+  // an installer named GoTechDesk-799990.exe (or an IT-placed firma.txt) fills this in
+  final codeController =
+      TextEditingController(text: saved.isNotEmpty ? saved : goTechPresetCompanyCode());
   final nameController = TextEditingController();
   final labelController = TextEditingController();
   var unattended = bind.mainGetLocalOption(key: kOptionGoTechUnattended) == 'Y';
+  var lockToTeam = bind.mainGetLocalOption(key: kOptionGoTechLockToTeam) != 'N';
   GoTechLookup? lookup;
   String? who;
   var errMsg = '';
@@ -79,6 +84,8 @@ void showGoTechRegisterDialog() {
       if (who == _kSharedComputer && label.isEmpty) {
         return 'Bilgisayar için bir ad yazın (ör. Resepsiyon).';
       }
+      await bind.mainSetLocalOption(
+          key: kOptionGoTechLockToTeam, value: lockToTeam ? '' : 'N');
       final err = await goTechRegister(
         customerCode: codeController.text.trim(),
         unattended: unattended,
@@ -87,6 +94,7 @@ void showGoTechRegisterDialog() {
         label: who == _kSharedComputer ? label : null,
       );
       if (err == null) {
+        await applyGoTechLock();
         close();
         showToast(
             '${GoTechRegistration.companyName.value} olarak kaydedildi');
@@ -126,6 +134,8 @@ void showGoTechRegisterDialog() {
               labelController: labelController,
               unattended: unattended,
               onUnattended: (v) => setState(() => unattended = v),
+              lockToTeam: lockToTeam,
+              onLock: (v) => setState(() => lockToTeam = v),
               loading: loading,
               errMsg: errMsg,
             ),
@@ -187,6 +197,8 @@ List<Widget> _personStep({
   required TextEditingController labelController,
   required bool unattended,
   required ValueChanged<bool> onUnattended,
+  required bool lockToTeam,
+  required ValueChanged<bool> onLock,
   required bool loading,
   required String errMsg,
 }) {
@@ -248,6 +260,16 @@ List<Widget> _personStep({
       Text(errMsg, style: const TextStyle(color: kGoTechRed))
           .marginOnly(top: 8),
     const SizedBox(height: 8),
+    CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: lockToTeam,
+      onChanged: loading ? null : (v) => onLock(v ?? false),
+      title: const Text('Yalnızca GoTech bağlanabilsin'),
+      subtitle: const Text(
+          'Bu bilgisayara sadece GoTech ekibinin bilgisayarları bağlanabilir, '
+          'başka kimse deneyemez.'),
+    ),
     CheckboxListTile(
       contentPadding: EdgeInsets.zero,
       controlAffinity: ListTileControlAffinity.leading,
@@ -328,6 +350,98 @@ void showGoTechSupportDialog() {
       onCancel: close,
     );
   });
+}
+
+/// What a customer's computer shows instead of the peer lists: how support works.
+class GoTechCustomerHint extends StatelessWidget {
+  const GoTechCustomerHint({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).textTheme.titleLarge?.color;
+    final locked =
+        bind.mainGetLocalOption(key: kOptionGoTechLockToTeam) != 'N';
+    final lines = [
+      (Icons.support_agent_rounded,
+          'Sorun yaşadığınızda "Destek iste" deyin, GoTech ekibi bağlansın.'),
+      (Icons.verified_user_outlined,
+          locked
+              ? 'Bu bilgisayara yalnızca GoTech ekibinin bilgisayarları bağlanabilir.'
+              : 'Bağlantı isteklerini ekranınızdan siz onaylıyorsunuz.'),
+      (Icons.password_rounded,
+          'Yukarıdaki kimlik ve parolayı yalnızca GoTech ekibiyle paylaşın.'),
+    ];
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (icon, text) in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 18, color: kGoTechRed),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(text,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: textColor?.withOpacity(0.75))),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Offers the newer build the panel published.
+class GoTechUpdateBar extends StatelessWidget {
+  const GoTechUpdateBar({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (!GoTechUpdate.available) return const SizedBox.shrink();
+      return Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(kGoTechRadius),
+          color: kGoTechRed.withOpacity(0.12),
+          border: Border.all(color: kGoTechRed.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.system_update_alt_rounded,
+                size: 18, color: kGoTechRed),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Yeni sürüm hazır (${GoTechUpdate.version.value}). '
+                'İndirip kurduğunuzda ayarlarınız korunur.',
+                maxLines: 2,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => launchUrl(Uri.parse(GoTechUpdate.url.value)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kGoTechRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('İndir'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
 }
 
 /// One-line status under the device card: registered company or a prompt.

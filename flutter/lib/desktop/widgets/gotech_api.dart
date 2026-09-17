@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:get/get.dart';
@@ -20,6 +21,11 @@ const kOptionGoTechLabel = 'gotech-label';
 const kOptionGoTechUnattended = 'gotech-unattended';
 const kOptionGoTechDeviceToken = 'gotech-device-token';
 const kOptionGoTechRegisterSkipped = 'gotech-register-skipped';
+const kOptionGoTechSupportIds = 'gotech-support-ids';
+const kOptionGoTechSupportNames = 'gotech-support-names';
+const kOptionGoTechLockToTeam = 'gotech-lock-to-team';
+const kOptionGoTechLatestVersion = 'gotech-latest-version';
+const kOptionGoTechDownloadUrl = 'gotech-download-url';
 
 const kGoTechCompanyCodeLength = 6;
 const _kUnattendedPasswordLength = 20;
@@ -50,6 +56,52 @@ class GoTechResult<T> {
   const GoTechResult.ok(this.value) : error = null;
   const GoTechResult.fail(this.error) : value = null;
 }
+
+/// The newest version the panel offers, when it is newer than this build.
+class GoTechUpdate {
+  static final version = ''.obs;
+  static final url = ''.obs;
+
+  static void load() {
+    final latest = _get(kOptionGoTechLatestVersion);
+    version.value = _isNewer(latest, _currentVersion) ? latest : '';
+    url.value = _get(kOptionGoTechDownloadUrl);
+  }
+
+  static bool get available => version.value.isNotEmpty && url.value.isNotEmpty;
+}
+
+String _currentVersion = '';
+
+/// "1.6.0" > "1.5.0"; anything unparsable counts as not newer.
+bool _isNewer(String candidate, String current) {
+  final a = candidate.split('.').map(int.tryParse).toList();
+  final b = current.split('.').map(int.tryParse).toList();
+  if (a.length != 3 || b.length != 3 || a.contains(null) || b.contains(null)) {
+    return false;
+  }
+  for (var i = 0; i < 3; i++) {
+    if (a[i]! != b[i]!) return a[i]! > b[i]!;
+  }
+  return false;
+}
+
+/// Name of the GoTech team member sitting at [peerId], or null for anyone else.
+String? goTechSupportName(String peerId) {
+  final raw = _get(kOptionGoTechSupportNames);
+  if (raw.isEmpty) return null;
+  try {
+    final map = jsonDecode(raw);
+    final name = map is Map ? map[peerId.replaceAll(' ', '')] : null;
+    return name is String && name.isNotEmpty ? name : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// True on a computer registered to a customer company, which gets the simplified screen.
+bool get isGoTechCustomerMachine =>
+    GoTechRegistration.isRegistered && _get('gotech-full-ui') != 'Y';
 
 /// Registration state shown on the home page.
 class GoTechRegistration {
@@ -205,7 +257,32 @@ Future<void> _clearRegistration() async {
 
 /// Refreshes what the panel knows about this device and what we show.
 /// Returns false when the panel no longer knows this device.
+/// The company code an installer carried in its file name (GoTechDesk-799990.exe)
+/// or that an IT department dropped next to the app, so the customer types nothing.
+String goTechPresetCompanyCode() {
+  final fromName = RegExp(r'(\d{6})')
+      .firstMatch(File(Platform.resolvedExecutable).uri.pathSegments.last);
+  if (fromName != null) return fromName.group(1)!;
+  for (final path in [
+    r'C:\ProgramData\GoTechDesk\firma.txt',
+    '/Library/Application Support/GoTechDesk/firma.txt',
+  ]) {
+    try {
+      final file = File(path);
+      if (file.existsSync()) {
+        final code = RegExp(r'\d{6}').firstMatch(file.readAsStringSync());
+        if (code != null) return code.group(0)!;
+      }
+    } catch (_) {
+      // unreadable is the same as absent
+    }
+  }
+  return '';
+}
+
 Future<bool> goTechHeartbeat() async {
+  _currentVersion = await bind.mainGetVersion();
+  GoTechUpdate.load();
   final token = _get(kOptionGoTechDeviceToken);
   if (token.isEmpty) {
     if (_get(kOptionGoTechCustomerCode).isNotEmpty) {
@@ -232,6 +309,8 @@ Future<bool> goTechHeartbeat() async {
       if (_str(body, 'customerCode').isNotEmpty) {
         await _set(kOptionGoTechCustomerCode, _str(body, 'customerCode'));
       }
+      await _applySupport(body['support']);
+      await _applyUpdate(body['update']);
       GoTechRegistration.load();
     }
   } catch (e) {
@@ -239,6 +318,41 @@ Future<bool> goTechHeartbeat() async {
     debugPrint('GoTech heartbeat failed: $e');
   }
   return true;
+}
+
+/// Stores the GoTech team's computers and, while the lock is on, lets only them connect.
+Future<void> _applySupport(dynamic support) async {
+  if (support is! Map) return;
+  final ids = (support['ids'] is List ? support['ids'] as List : [])
+      .map((id) => '$id'.replaceAll(' ', ''))
+      .where((id) => id.isNotEmpty)
+      .toList();
+  await _set(kOptionGoTechSupportIds, ids.join(','));
+  final names = support['names'];
+  await _set(kOptionGoTechSupportNames, names is Map ? jsonEncode(names) : '');
+  await applyGoTechLock();
+}
+
+/// Writes (or clears) RustDesk's id whitelist from the team list.
+Future<void> applyGoTechLock() async {
+  final locked = _get(kOptionGoTechLockToTeam) != 'N';
+  final ids = _get(kOptionGoTechSupportIds);
+  final current = bind.mainGetOptionSync(key: kOptionIdWhitelist);
+  final wanted = locked ? ids : '';
+  // only touch the option when we own its value, so a hand-written whitelist survives
+  if (current == wanted || (current.isNotEmpty && !locked && current != ids)) return;
+  await bind.mainSetOption(key: kOptionIdWhitelist, value: wanted);
+}
+
+Future<void> _applyUpdate(dynamic update) async {
+  if (update is! Map) {
+    await _set(kOptionGoTechLatestVersion, '');
+    return;
+  }
+  final version = '${update['version'] ?? ''}';
+  final url = Platform.isMacOS ? '${update['macUrl'] ?? ''}' : '${update['windowsUrl'] ?? ''}';
+  await _set(kOptionGoTechLatestVersion, version);
+  await _set(kOptionGoTechDownloadUrl, url);
 }
 
 Future<GoTechResult<int>> goTechSupportRequest(String message) async {

@@ -193,6 +193,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         const SizedBox(height: 14),
         if (!isOutgoingOnly) const GoTechDeviceCard(),
         if (!isOutgoingOnly) const GoTechRegistrationBar(),
+        const GoTechUpdateBar(),
         Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
       ],
     );

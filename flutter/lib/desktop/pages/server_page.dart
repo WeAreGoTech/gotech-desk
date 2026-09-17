@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/desktop/widgets/gotech_api.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/cm_file_model.dart';
@@ -485,7 +486,8 @@ class _CmHeaderState extends State<_CmHeader>
               children: [
                 FittedBox(
                     child: Text(
-                  client.name,
+                  // a GoTech team computer shows who is at the other end
+                  goTechSupportName(client.peerId) ?? client.name,
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -496,7 +498,9 @@ class _CmHeaderState extends State<_CmHeader>
                 )),
                 FittedBox(
                   child: Text(
-                    "(${client.peerId})",
+                    goTechSupportName(client.peerId) != null
+                        ? "GoTech Destek · ${client.peerId}"
+                        : "(${client.peerId})",
                     style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ),

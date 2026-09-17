@@ -21,6 +21,7 @@ import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../desktop/widgets/gotech_home.dart';
+import '../../desktop/widgets/gotech_register.dart';
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
@@ -693,7 +694,12 @@ class _ConnectionPageState extends State<ConnectionPage>
                   const SizedBox(height: 16),
                   _buildRemoteIDTextField(context),
                   const SizedBox(height: 22),
-                  Expanded(child: PeerTabPage()),
+                  // a customer's computer is only ever connected to, so the peer
+                  // lists and the address-book login would only be clutter
+                  if (isGoTechCustomerMachine)
+                    const Expanded(child: GoTechCustomerHint())
+                  else
+                    Expanded(child: PeerTabPage()),
                 ],
               ).paddingSymmetric(horizontal: 24),
             ),

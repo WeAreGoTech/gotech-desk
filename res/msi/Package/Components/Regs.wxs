@@ -72,6 +72,11 @@
 		</DirectoryRef>
 
 		<StandardDirectory Id="CommonAppDataFolder">
+			<!-- msiexec /i GoTechDesk.msi GOTECH_CODE=799990 -> the app registers itself to that company on first run -->
+			<Component Id="Product.GoTech.CompanyCode" Guid="7C1B0B59-6E23-4C6E-9A0E-3F7E4D35A9C1" Condition="GOTECH_CODE">
+				<IniFile Id="GoTechCompanyCode" Action="createLine" Directory="App.Data.Folder" Name="firma.ini" Section="GoTech" Key="Firma" Value="[GOTECH_CODE]" />
+			</Component>
+
 			<Component Id="Product.Registry.RemoveLegacyUninstall64" Guid="7524B741-94C2-4C50-A151-DDB37860DC20" Bitness="always64" KeyPath="yes" Condition="APP_WINDOWS_INSTALLER=&quot;#1&quot;">
 				<RemoveRegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\$(var.Product)" Action="removeOnInstall" />
 			</Component>

@@ -54,6 +54,7 @@
 			<ComponentRef Id="Product.Registry.URLProtocol" />
 			<ComponentRef Id="Product.Registry.Command" />
 			<ComponentRef Id="Product.Registry.InstallState" />
+			<ComponentRef Id="Product.GoTech.CompanyCode" />
 			<ComponentRef Id="Product.Registry.RemoveLegacyUninstall64" />
 			<ComponentRef Id="Product.Registry.RemoveLegacyUninstall32" />
 			<ComponentRef Id="App.StartMenu" />
