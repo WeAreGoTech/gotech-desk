@@ -1,182 +1,148 @@
 <p align="center">
-  <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
-  <a href="#raw-steps-to-build">Build</a> •
-  <a href="#how-to-build-with-docker">Docker</a> •
-  <a href="#file-structure">Structure</a> •
-  <a href="#screenshots">Screenshots</a><br>
-  [<a href="docs/README-UA.md">Українська</a>] | [<a href="docs/README-CS.md">česky</a>] | [<a href="docs/README-ZH.md">中文</a>] | [<a href="docs/README-HU.md">Magyar</a>] | [<a href="docs/README-ES.md">Español</a>] | [<a href="docs/README-FA.md">فارسی</a>] | [<a href="docs/README-FR.md">Français</a>] | [<a href="docs/README-DE.md">Deutsch</a>] | [<a href="docs/README-PL.md">Polski</a>] | [<a href="docs/README-ID.md">Indonesian</a>] | [<a href="docs/README-FI.md">Suomi</a>] | [<a href="docs/README-ML.md">മലയാളം</a>] | [<a href="docs/README-JP.md">日本語</a>] | [<a href="docs/README-NL.md">Nederlands</a>] | [<a href="docs/README-IT.md">Italiano</a>] | [<a href="docs/README-RU.md">Русский</a>] | [<a href="docs/README-PTBR.md">Português (Brasil)</a>] | [<a href="docs/README-EO.md">Esperanto</a>] | [<a href="docs/README-KR.md">한국어</a>] | [<a href="docs/README-AR.md">العربي</a>] | [<a href="docs/README-VN.md">Tiếng Việt</a>] | [<a href="docs/README-DA.md">Dansk</a>] | [<a href="docs/README-GR.md">Ελληνικά</a>] | [<a href="docs/README-TR.md">Türkçe</a>] | [<a href="docs/README-NO.md">Norsk</a>] | [<a href="docs/README-RO.md">Română</a>]<br>
-  <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
+  <img src="brand/gotech-logo.png" alt="GoTech" height="72"><br>
+  <b>GoTechDesk — GoTech uzak destek uygulaması</b>
 </p>
 
-> [!Caution]
-> **Misuse Disclaimer:** <br>
-> The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
+GoTechDesk, GoTech'in kendi sunucusunda çalışan uzak destek uygulamasıdır. Açık kaynaklı
+[RustDesk](https://github.com/rustdesk/rustdesk)'in bir fork'udur; bağlantılar başka hiçbir
+firmanın sunucusundan geçmez, kendi makinemize (rendezvous + relay) gider.
 
+- Müşteri bilgisayarları: **Windows**
+- GoTech ekibi: **Windows / macOS**
+- Panel: [GoTech Paneli](https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io) — bilgisayarlar, destek talepleri, tek tıkla bağlanma
 
-Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+---
 
-[![RustDesk Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-Advanced%20Features-blue)](https://rustdesk.com/pricing.html)
+## Müşteriler için — nasıl çalışır?
 
-Yet another remote desktop solution, written in Rust. Works out of the box with no configuration required. You have full control of your data, with no concerns about security. You can use our rendezvous/relay server, [set up your own](https://rustdesk.com/server), or [write your own rendezvous/relay server](https://github.com/rustdesk/rustdesk-server-demo).
+> Bu bölümü müşteriye olduğu gibi gönderebilirsiniz.
 
-![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
+**GoTechDesk nedir?** GoTech'in size uzaktan destek verebilmesi için bilgisayarınıza
+kurduğunuz küçük bir programdır. Bir arıza olduğunda telefonda tarif etmek yerine,
+ekranınızı bizim görmemizi ve gerekirse sorunu doğrudan çözmemizi sağlar.
 
-RustDesk welcomes contribution from everyone. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for help getting started.
+**Kurulum**
 
-[**FAQ**](https://github.com/rustdesk/rustdesk/wiki/FAQ)
+1. GoTech'in size gönderdiği indirme bağlantısına tıklayın; dosya `GoTechDesk-123456.exe`
+   gibi firma kodunuzu taşıyan bir adla iner.
+2. Dosyayı çalıştırıp kurun. Firma kodu dosyanın içinden geldiği için **kod yazmanıza gerek yok**.
+3. Program ilk açıldığında sadece **adınızı** seçersiniz (listede yoksa yazabilir, ortak
+   kullanılan bir bilgisayarsa "Ortak bilgisayar" diyebilirsiniz).
+4. Bilgisayar artık GoTech panelinde görünür. Kapatmadığınız sürece destek istediğinizde
+   hazırdır.
 
-[**BINARY DOWNLOAD**](https://github.com/rustdesk/rustdesk/releases)
+**Destek nasıl başlar?**
 
-[**NIGHTLY BUILD**](https://github.com/rustdesk/rustdesk/releases/tag/nightly)
+- Uygulamadaki **Destek iste** düğmesine basarsınız; talep GoTech'e düşer.
+- Bir GoTech teknisyeni bağlanmak istediğinde ekranınızda bir onay kutusu çıkar ve
+  **kimin bağlandığını isim isim yazar** (örnek: *GoTech Destek · Abdullah Hüseyin Efe*).
+  Siz onaylamadan kimse bağlanamaz.
+- Bağlantı sırasında ekranınızda ne olduğunu görürsünüz; istediğiniz an oturumu
+  kapatabilirsiniz.
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/en/packages/com.carriez.flutter_hbb)
-[<img src="https://flathub.org/api/badge?svg&locale=en"
-    alt="Get it on Flathub"
-    height="80">](https://flathub.org/apps/com.rustdesk.RustDesk)
+**Güvenlik**
 
-## Dependencies
+- Uygulama yalnızca **GoTech'in kayıtlı bilgisayarlarının** bağlanmasına izin verecek
+  şekilde kilitlenebilir; bu açıkken firma kodunuzu bilen biri bile bağlanamaz.
+- Tüm bağlantı trafiği uçtan uca şifrelenir ve GoTech'in kendi sunucusu üzerinden geçer.
+- Program arka planda kendiliğinden ekranınızı yayınlamaz; her oturum ya sizin onayınızla
+  ya da sizinle önceden anlaşılmış kurulum şifresiyle başlar.
+- Yeni sürüm çıktığında uygulamanın üstünde "Yeni sürüm hazır" şeridi belirir; tıklayıp
+  güncellemeniz yeterlidir.
 
-Desktop versions use Flutter or Sciter (deprecated) for GUI. This tutorial is for Sciter only, since it is easier and more friendly to start. Check out our [CI](https://github.com/rustdesk/rustdesk/blob/master/.github/workflows/flutter-build.yml) for building the Flutter version.
+**Kaldırmak isterseniz:** Windows'ta *Ayarlar → Uygulamalar* üzerinden normal bir program
+gibi kaldırabilirsiniz.
 
-Please download Sciter dynamic library yourself.
+---
 
-[Windows](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.win/x64/sciter.dll) |
-[Linux](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so) |
-[macOS](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.osx/libsciter.dylib)
+## GoTech ekibi için
 
-## Raw Steps to build
+| İş | Nerede |
+|---|---|
+| Müşteri bilgisayarlarını görmek, bağlanmak | Yönetim → **Cihazlar** |
+| Müşteriye kurulum linki vermek | Yönetim → **Müşteriler** → firma sayfası (link firma kodunu taşır) |
+| Kendi bilgisayarını "GoTech bilgisayarı" olarak tanıtmak | Yönetim → **Hesabım** → *GoTech Desk bilgisayarlarım* |
+| Kimde hangi bilgisayar var | Yönetim → **Ekip** |
+| Destek talepleri, ekran kayıtları, dosyalar | Yönetim → **Destek talepleri** |
 
-- Prepare your Rust development env and C++ build env
+Müşteri kendi tarafında bilgisayarlarını **Panel → Uzak Destek** altında görür.
 
-- Install [vcpkg](https://github.com/microsoft/vcpkg), and set `VCPKG_ROOT` env variable correctly
+Müşteri tarafındaki kilit (`sadece GoTech bağlanabilsin`) panelde kayıtlı ekip
+bilgisayarlarının listesini kullanır. Yeni bir teknisyen bilgisayarı eklenmediği sürece o
+makineden bağlanılamaz — yeni personelde ilk iş bu.
 
-  - Windows: vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-  - Linux/macOS: vcpkg install libvpx libyuv opus aom
+Toplu kurulumda firma kodu msiexec ile de verilebilir:
 
-- run `cargo run`
-
-## [Build](https://rustdesk.com/docs/en/dev/build/)
-
-## How to Build on Linux
-
-### Ubuntu 18 (Debian 10)
-
-```sh
-sudo apt install -y zip g++ gcc git curl wget nasm yasm libgtk-3-dev clang libxcb-randr0-dev libxdo-dev \
-        libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev cmake make \
-        libclang-dev ninja-build libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+```
+msiexec /i GoTechDesk.msi /qn GOTECH_CODE=123456
 ```
 
-### openSUSE Tumbleweed
+---
 
-```sh
-sudo zypper install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libXfixes-devel cmake alsa-lib-devel gstreamer-devel gstreamer-plugins-base-devel xdotool-devel
+## Bu fork'ta RustDesk'ten farkı ne?
+
+- Sunucu ve genel anahtar uygulamanın içine gömülü — müşteri hiçbir adres girmiyor.
+- İsim, ikon ve renkler GoTech'e göre (`#E2463B`).
+- Kurulum dosyasının adından/`firma.txt`'den/msiexec parametresinden **firma kodu** okunuyor.
+- Müşteri ekranı sadeleştirildi: adres defteri, sunucu ayarları, bağlantı geçmişi gizli.
+- Bağlantı onay kutusunda **bağlanan teknisyenin adı** yazıyor.
+- Panelden gelen listeyle **yalnızca GoTech bilgisayarları** bağlanabiliyor.
+- Panele kayıt / heartbeat / destek talebi ve kendi **otomatik güncelleme** şeridimiz.
+
+Değişen dosyalar ağırlıklı olarak `flutter/lib/desktop/widgets/gotech_*.dart`,
+`flutter/lib/desktop/pages/*`, `res/msi/` ve `.github/workflows/gotech-*.yml`.
+
+---
+
+## Geliştirme
+
+Derleme adımları RustDesk ile aynı; ayrıntı için [docs/README-rustdesk.md](docs/README-rustdesk.md).
+Sürümleri elle derlemeye gerek yok, GitHub Actions kullanıyoruz:
+
+```
+gh workflow run gotech-windows.yml -R WeAreGoTech/gotech-desk --ref master
+gh workflow run gotech-macos.yml   -R WeAreGoTech/gotech-desk --ref master
 ```
 
-### Fedora 28 (CentOS 8)
+Çıkan `.exe` / `.msi` / `.dmg` dosyaları Releases'e yüklenir, panelin
+`DESK_DOWNLOAD_*` ve `DESK_LATEST_VERSION` değişkenleri o sürüme bakar.
 
-```sh
-sudo yum -y install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libxdo-devel libXfixes-devel pulseaudio-libs-devel cmake alsa-lib-devel gstreamer1-devel gstreamer1-plugins-base-devel
+`libs/hbb_common` ayrı bir fork'tur: [WeAreGoTech/gotech-hbb-common](https://github.com/WeAreGoTech/gotech-hbb-common) (`gotech` dalı).
+
+### RustDesk'ten güvenlik güncellemesi almak
+
+Fork, upstream'den kopuk değil; RustDesk'te çıkan güvenlik yamalarını düzenli olarak
+birleştiriyoruz. `upstream` remote'ları bir kez eklendikten sonra:
+
+```bash
+# önce alt modül
+cd libs/hbb_common
+git fetch upstream && git merge upstream/main
+git push origin gotech
+
+# sonra ana repo
+cd ../..
+git fetch upstream && git merge upstream/master
+git add libs/hbb_common && git commit
+git push origin master
 ```
 
-### Arch (Manjaro)
+Bizim değişikliklerimiz upstream'in dokunmadığı dosyalarda durduğu için birleştirme
+genelde çakışmasız geçer; tek beklenen çakışma `libs/hbb_common` işaretçisidir, onu da
+kendi merge'imizle çözüyoruz. Birleştirme sonrası her iki platformu da yeniden derleyip
+yeni sürümü yayınlayın.
 
-```sh
-sudo pacman -Syu --needed unzip git cmake gcc curl wget yasm nasm zip make pkg-config clang gtk3 xdotool libxcb libxfixes alsa-lib pipewire
+Remote'lar (bir kez):
+
+```bash
+git remote add upstream https://github.com/rustdesk/rustdesk.git
+git -C libs/hbb_common remote add upstream https://github.com/rustdesk/hbb_common.git
 ```
 
-### Install vcpkg
+---
 
-```sh
-git clone https://github.com/microsoft/vcpkg
-cd vcpkg
-git checkout 2023.04.15
-cd ..
-vcpkg/bootstrap-vcpkg.sh
-export VCPKG_ROOT=$HOME/vcpkg
-vcpkg/vcpkg install libvpx libyuv opus aom
-```
+## Lisans ve teşekkür
 
-### Fix libvpx (For Fedora)
-
-```sh
-cd vcpkg/buildtrees/libvpx/src
-cd *
-./configure
-sed -i 's/CFLAGS+=-I/CFLAGS+=-fPIC -I/g' Makefile
-sed -i 's/CXXFLAGS+=-I/CXXFLAGS+=-fPIC -I/g' Makefile
-make
-cp libvpx.a $HOME/vcpkg/installed/x64-linux/lib/
-cd
-```
-
-### Build
-
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-git clone --recurse-submodules https://github.com/rustdesk/rustdesk
-cd rustdesk
-mkdir -p target/debug
-wget https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-mv libsciter-gtk.so target/debug
-VCPKG_ROOT=$HOME/vcpkg cargo run
-```
-
-## How to build with Docker
-
-Begin by cloning the repository and building the Docker container:
-
-```sh
-git clone https://github.com/rustdesk/rustdesk
-cd rustdesk
-git submodule update --init --recursive
-docker build -t "rustdesk-builder" .
-```
-
-Then, each time you need to build the application, run the following command:
-
-```sh
-docker run --rm -it -v $PWD:/home/user/rustdesk -v rustdesk-git-cache:/home/user/.cargo/git -v rustdesk-registry-cache:/home/user/.cargo/registry -e PUID="$(id -u)" -e PGID="$(id -g)" rustdesk-builder
-```
-
-Note that the first build may take longer before dependencies are cached, subsequent builds will be faster. Additionally, if you need to specify different arguments to the build command, you may do so at the end of the command in the `<OPTIONAL-ARGS>` position. For instance, if you wanted to build an optimized release version, you would run the command above followed by `--release`. The resulting executable will be available in the target folder on your system, and can be run with:
-
-```sh
-target/debug/rustdesk
-```
-
-Or, if you're running a release executable:
-
-```sh
-target/release/rustdesk
-```
-
-Please ensure that you run these commands from the root of the RustDesk repository, or the application may not find the required resources. Also note that other cargo subcommands such as `install` or `run` are not currently supported via this method as they would install or run the program inside the container instead of the host.
-
-## File Structure
-
-- **[libs/hbb_common](https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common)**: video codec, config, tcp/udp wrapper, and some other utility functions shared with the server
-- **[libs/base](https://github.com/rustdesk/rustdesk/tree/master/libs/base)**: protobuf, fs functions for file transfer, keyboard and platform code used only by this app
-- **[libs/scrap](https://github.com/rustdesk/rustdesk/tree/master/libs/scrap)**: screen capture
-- **[libs/enigo](https://github.com/rustdesk/rustdesk/tree/master/libs/enigo)**: platform specific keyboard/mouse control
-- **[libs/clipboard](https://github.com/rustdesk/rustdesk/tree/master/libs/clipboard)**: file copy and paste implementation for Windows, Linux, macOS.
-- **[src/ui](https://github.com/rustdesk/rustdesk/tree/master/src/ui)**: obsolete Sciter UI (deprecated)
-- **[src/server](https://github.com/rustdesk/rustdesk/tree/master/src/server)**: audio/clipboard/input/video services, and network connections
-- **[src/client.rs](https://github.com/rustdesk/rustdesk/tree/master/src/client.rs)**: start a peer connection
-- **[src/rendezvous_mediator.rs](https://github.com/rustdesk/rustdesk/tree/master/src/rendezvous_mediator.rs)**: Communicate with [rustdesk-server](https://github.com/rustdesk/rustdesk-server), wait for remote direct (TCP hole punching) or relayed connection
-- **[src/platform](https://github.com/rustdesk/rustdesk/tree/master/src/platform)**: platform specific code
-- **[flutter](https://github.com/rustdesk/rustdesk/tree/master/flutter)**: Flutter code for desktop and mobile
-
-## Screenshots
-
-![Connection Manager](https://github.com/rustdesk/rustdesk/assets/28412477/db82d4e7-c4bc-4823-8e6f-6af7eadf7651)
-
-![Connected to a Windows PC](https://github.com/rustdesk/rustdesk/assets/28412477/9baa91e9-3362-4d06-aa1a-7518edcbd7ea)
-
-![File Transfer](https://github.com/rustdesk/rustdesk/assets/28412477/39511ad3-aa9a-4f8c-8947-1cce286a46ad)
-
-![TCP Tunneling](https://github.com/rustdesk/rustdesk/assets/28412477/78e8708f-e87e-4570-8373-1360033ea6c5)
-
+Bu proje [RustDesk](https://github.com/rustdesk/rustdesk)'in fork'udur ve aynı lisansla,
+**AGPL-3.0** ile dağıtılır (bkz. [LICENCE](LICENCE)). RustDesk ekibine ve katkı verenlere
+teşekkürler.
