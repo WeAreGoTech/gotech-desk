@@ -21,6 +21,7 @@ const kOptionGoTechLabel = 'gotech-label';
 const kOptionGoTechUnattended = 'gotech-unattended';
 const kOptionGoTechDeviceToken = 'gotech-device-token';
 const kOptionGoTechRegisterSkipped = 'gotech-register-skipped';
+const kOptionGoTechTeamOwner = 'gotech-team-owner';
 const kOptionGoTechSupportIds = 'gotech-support-ids';
 const kOptionGoTechSupportNames = 'gotech-support-names';
 const kOptionGoTechLockToTeam = 'gotech-lock-to-team';
@@ -109,19 +110,24 @@ class GoTechRegistration {
   static final companyName = ''.obs;
   static final personName = ''.obs;
   static final label = ''.obs;
+  static final teamOwner = ''.obs;
 
   static void load() {
     customerCode.value = _get(kOptionGoTechCustomerCode);
     companyName.value = _get(kOptionGoTechCompanyName);
     personName.value = _get(kOptionGoTechPersonName);
     label.value = _get(kOptionGoTechLabel);
+    teamOwner.value = _get(kOptionGoTechTeamOwner);
   }
+
+  /// A GoTech computer: not a customer, known to the panel by the desk ID a team member added.
+  static bool get isTeamMachine => !isRegistered && teamOwner.value.isNotEmpty;
 
   static bool get isRegistered =>
       customerCode.value.isNotEmpty && _get(kOptionGoTechDeviceToken).isNotEmpty;
 
   static bool get shouldPrompt =>
-      !isRegistered && _get(kOptionGoTechRegisterSkipped) != 'Y';
+      !isRegistered && !isTeamMachine && _get(kOptionGoTechRegisterSkipped) != 'Y';
 
   static String get who =>
       [personName.value, label.value].where((s) => s.isNotEmpty).join(' · ');
@@ -280,6 +286,31 @@ String goTechPresetCompanyCode() {
   return '';
 }
 
+/// A GoTech computer has no device token to authenticate with, so it asks whether the panel
+/// knows its desk ID as one of the team's. Answered yes, it skips the customer registration and
+/// still gets the support directory and update notice.
+Future<void> _askIfTeamMachine() async {
+  try {
+    final (status, body) = await _post('/api/desk/team', {
+      'deskId': await _deskId(),
+      'hostname': Platform.localHostname,
+      'appVersion': _currentVersion,
+    });
+    if (status != _kHttpOk) return;
+    if (body['ok'] != true) {
+      await _set(kOptionGoTechTeamOwner, '');
+    } else {
+      await _set(kOptionGoTechTeamOwner, _str(body, 'ownerName'));
+      await _applySupport(body['support']);
+      await _applyUpdate(body['update']);
+    }
+    GoTechRegistration.load();
+  } catch (e) {
+    // offline is fine: keep what we knew
+    debugPrint('GoTech team check failed: $e');
+  }
+}
+
 Future<bool> goTechHeartbeat() async {
   _currentVersion = await bind.mainGetVersion();
   GoTechUpdate.load();
@@ -289,6 +320,7 @@ Future<bool> goTechHeartbeat() async {
       await _clearRegistration();
       return false;
     }
+    await _askIfTeamMachine();
     return true;
   }
   try {

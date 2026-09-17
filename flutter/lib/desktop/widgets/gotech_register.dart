@@ -453,6 +453,7 @@ class GoTechRegistrationBar extends StatelessWidget {
     final textColor = Theme.of(context).textTheme.titleLarge?.color;
     return Obx(() {
       final registered = GoTechRegistration.isRegistered;
+      final team = GoTechRegistration.isTeamMachine;
       final who = GoTechRegistration.who;
       return Container(
         margin: const EdgeInsets.only(top: 10),
@@ -461,9 +462,13 @@ class GoTechRegistrationBar extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              registered ? Icons.verified_rounded : Icons.info_outline_rounded,
+              registered
+                  ? Icons.verified_rounded
+                  : team
+                      ? Icons.shield_rounded
+                      : Icons.info_outline_rounded,
               size: 18,
-              color: registered ? Colors.green : kGoTechRed,
+              color: registered || team ? Colors.green : kGoTechRed,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -486,18 +491,26 @@ class GoTechRegistrationBar extends StatelessWidget {
                         ),
                       ],
                     )
-                  : Text(
+                  : team
+                      ? Text(
+                          'GoTech ekip bilgisayarı · ${GoTechRegistration.teamOwner.value}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: textColor),
+                        )
+                      : Text(
                       'Bu bilgisayar henüz bir GoTech müşterisine kayıtlı değil.',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13, color: textColor),
                     ),
             ),
-            TextButton(
-              onPressed: showGoTechRegisterDialog,
-              style: TextButton.styleFrom(foregroundColor: kGoTechRed),
-              child: Text(registered ? 'Değiştir' : 'Kayıt ol'),
-            ),
+            if (!team)
+              TextButton(
+                onPressed: showGoTechRegisterDialog,
+                style: TextButton.styleFrom(foregroundColor: kGoTechRed),
+                child: Text(registered ? 'Değiştir' : 'Kayıt ol'),
+              ),
             if (registered)
               ElevatedButton.icon(
                 onPressed: showGoTechSupportDialog,
