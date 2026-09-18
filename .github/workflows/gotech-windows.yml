@@ -123,11 +123,14 @@ jobs:
           fi
         shell: bash
 
-      # Keeps the old toolchain from resolving a dependency it cannot build.
+      # Keeps the old toolchain from resolving a dependency it cannot parse, then prunes
+      # its packages from Cargo.lock so the --locked build below still matches.
       - name: Drop the echo cancellation dependency
         if: matrix.variant.name == 'win7'
         shell: bash
-        run: sed -i '/sonora/d' Cargo.toml
+        run: |
+          sed -i '/sonora/d' Cargo.toml
+          cargo metadata --format-version 1 > /dev/null
 
       - name: Build GoTech Desk
         run: |

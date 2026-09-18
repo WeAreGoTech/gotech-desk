@@ -355,6 +355,8 @@ def get_features(args):
         if args.screencapturekit:
             features.append('screencapturekit')
     if args.echo_cancel:
+        if not (windows or osx):
+            raise Exception('--echo-cancel is Windows/macOS only')
         features.append('echo-cancel')
     print("features:", features)
     return features
