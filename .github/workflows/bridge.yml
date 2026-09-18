@@ -98,6 +98,11 @@ jobs:
           fi
           pushd flutter && flutter pub get && popd
 
+      # cargo metadata downloads optional dependencies too, and Rust 1.75 cannot parse
+      # the echo canceller's edition 2024 manifests; the bridge does not use it.
+      - name: Drop the echo cancellation dependency
+        run: sed -i '/sonora/d' Cargo.toml
+
       - name: Run flutter rust bridge
         run: |
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
