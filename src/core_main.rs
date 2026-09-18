@@ -195,6 +195,7 @@ pub fn core_main() -> Option<Vec<String>> {
         #[cfg(target_os = "macos")]
         {
             crate::platform::macos::try_remove_temp_update_dir(None);
+            crate::platform::macos::ensure_user_server_running();
         }
 
         #[cfg(windows)]

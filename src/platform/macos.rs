@@ -763,6 +763,28 @@ pub(crate) fn get_logged_in_uids() -> Vec<u32> {
     uids.into_iter().collect()
 }
 
+/// Starts the per-user `--server` agent when only the root daemon is up.
+///
+/// Screen capture and, above all, the microphone belong to the logged-in user's session: asked
+/// from the root daemon, CoreAudio reports no input device at all, so a voice call carries no
+/// microphone and the capture silently falls back to the system-sound loopback. `launchctl
+/// kickstart` without `-k` is a no-op when the agent already runs.
+pub fn ensure_user_server_running() {
+    let label = format!("{}_server", crate::get_full_name());
+    if !std::path::Path::new(&format!("/Library/LaunchAgents/{label}.plist")).exists() {
+        return;
+    }
+    let target = format!("gui/{}/{}", unsafe { libc::getuid() }, label);
+    match std::process::Command::new("/bin/launchctl")
+        .args(["kickstart", &target])
+        .status()
+    {
+        Ok(status) if status.success() => log::info!("user server agent running: {target}"),
+        Ok(status) => log::warn!("could not start {target}: {status}"),
+        Err(err) => log::warn!("could not start {target}: {err}"),
+    }
+}
+
 pub fn get_active_user_home() -> Option<PathBuf> {
     let username = get_active_username();
     if !username.is_empty() {
