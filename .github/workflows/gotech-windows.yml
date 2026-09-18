@@ -11,6 +11,10 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VERSION: "1.5.0"
   APP_NAME: "GoTechDesk"
+  # Signing is skipped until the SIGNPATH_ORGANIZATION_ID repository variable is set.
+  SIGNPATH_ORGANIZATION_ID: "${{ vars.SIGNPATH_ORGANIZATION_ID }}"
+  SIGNPATH_PROJECT_SLUG: "gotech-desk"
+  SIGNPATH_POLICY_SLUG: "release-signing"
 
 jobs:
   generate-bridge:
@@ -159,6 +163,29 @@ jobs:
           name: topmostwindow-artifacts-x64
           path: "./rustdesk"
 
+      # The app files are signed before packing, so the exe inside the portable
+      # packer and the msi carry the signature too.
+      - name: Upload unsigned app files
+        id: upload-unsigned-app
+        if: env.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gotech-desk-unsigned-app
+          path: ./rustdesk
+
+      - name: Sign app files
+        if: env.SIGNPATH_ORGANIZATION_ID != ''
+        uses: SignPath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: app-files
+          github-artifact-id: ${{ steps.upload-unsigned-app.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: ./rustdesk
+
       - name: Build self-extracted executable
         shell: bash
         run: |
@@ -185,6 +212,27 @@ jobs:
           $msi = Get-ChildItem ./Package/bin/*/Release/en-us/Package.msi | Select-Object -First 1
           mv $msi.FullName ../../SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64.msi
           popd
+
+      - name: Upload unsigned installers
+        id: upload-unsigned-installers
+        if: env.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gotech-desk-unsigned-installers
+          path: ./SignOutput
+
+      - name: Sign installers
+        if: env.SIGNPATH_ORGANIZATION_ID != ''
+        uses: SignPath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: installers
+          github-artifact-id: ${{ steps.upload-unsigned-installers.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: ./SignOutput
 
       - name: Upload installers
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
