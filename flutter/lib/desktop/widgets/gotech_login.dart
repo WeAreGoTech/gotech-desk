@@ -13,13 +13,14 @@ import 'gotech_register.dart';
 const _kDialogWidth = 420.0;
 
 /// What a computer nobody signed in on asks first: the panel e-mail and password. The account says whose
-/// computer it is, so there is no company code to find and no person to pick. A team member is asked once
-/// whether it is a GoTech computer, since the team also signs in on customers' computers to set them up.
+/// computer it is, so there is no company code to find and no person to pick. A team member is asked whether
+/// it is a GoTech computer and can turn it either way: the team also signs in on customers' computers.
 void showGoTechLoginDialog() {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   var unattended = bind.mainGetLocalOption(key: kOptionGoTechUnattended) == 'Y';
   GoTechAccount? staff;
+  var notice = '';
   var errMsg = '';
   var loading = false;
   var closed = false;
@@ -45,11 +46,36 @@ void showGoTechLoginDialog() {
     }
 
     Future<String?> claimForTeam(GoTechAccount account) async {
+      final wasCustomerOf = GoTechRegistration.isRegistered
+          ? GoTechRegistration.companyName.value
+          : '';
       final err = await goTechClaim(account);
       if (err != null) return err;
       await _keepSignedIn(account);
       finish();
-      showToast('GoTech ekip bilgisayarı olarak giriş yapıldı');
+      showToast(wasCustomerOf.isEmpty
+          ? 'GoTech ekip bilgisayarı olarak giriş yapıldı'
+          : '$wasCustomerOf kaydı kaldırıldı, GoTech ekip bilgisayarı oldu');
+      return null;
+    }
+
+    // "Hayır": the computer is not GoTech's. It leaves the team list, no team session stays on it, and the
+    // sign-in starts over for the customer's account or the company code.
+    Future<String?> notTeam(GoTechAccount account) async {
+      final err = await goTechReleaseTeam(account);
+      if (err != null) return err;
+      await goTechSignOut(account.token);
+      await _endKeptSession();
+      staff = null;
+      if (GoTechRegistration.isRegistered) {
+        finish();
+        showToast(
+            '${GoTechRegistration.companyName.value} bilgisayarı olarak kaldı');
+        return null;
+      }
+      passwordController.clear();
+      notice = 'Ekip bilgisayarı değil. Müşterinin hesabıyla giriş yapın '
+          'ya da firma koduyla kaydedin.';
       return null;
     }
 
@@ -62,8 +88,6 @@ void showGoTechLoginDialog() {
       final account = result.value;
       if (account == null) return result.error;
       if (account.isStaff) {
-        // a team computer already answered the question; it only needs the session back
-        if (GoTechRegistration.isTeamMachine) return claimForTeam(account);
         staff = account;
         return null;
       }
@@ -114,6 +138,7 @@ void showGoTechLoginDialog() {
               ..._teamStep(context, staff!.name)
             else
               ..._signInStep(
+                notice: notice,
                 emailController: emailController,
                 passwordController: passwordController,
                 unattended: unattended,
@@ -132,7 +157,7 @@ void showGoTechLoginDialog() {
       actions: askTeam
           ? [
               dialogButton('Hayır, müşteri bilgisayarı',
-                  onPressed: useCompanyCode, isOutline: true),
+                  onPressed: () => run(() => notTeam(staff!)), isOutline: true),
               dialogButton('Evet, ekip bilgisayarım',
                   onPressed: () => run(() => claimForTeam(staff!))),
             ]
@@ -147,6 +172,7 @@ void showGoTechLoginDialog() {
 }
 
 List<Widget> _signInStep({
+  required String notice,
   required TextEditingController emailController,
   required TextEditingController passwordController,
   required bool unattended,
@@ -156,6 +182,9 @@ List<Widget> _signInStep({
   required VoidCallback onCompanyCode,
 }) {
   return [
+    if (notice.isNotEmpty)
+      Text(notice, style: const TextStyle(fontWeight: FontWeight.w600))
+          .marginOnly(bottom: 6),
     const Text(
         'GoTech panelindeki e-posta adresiniz ve şifrenizle giriş yapın. '
         'Bilgisayarınız firmanıza kendiliğinden kaydolur.'),
@@ -209,14 +238,20 @@ List<Widget> _signInStep({
 
 List<Widget> _teamStep(BuildContext context, String name) {
   final muted = Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.7);
+  // what the answer will change, so turning a computer either way is never a surprise
+  final now = GoTechRegistration.isRegistered
+      ? 'Şu an ${GoTechRegistration.companyName.value} firmasına kayıtlı; '
+          '"Evet" derseniz firma kaydı kaldırılır.'
+      : GoTechRegistration.isTeamMachine
+          ? 'Şu an GoTech ekip bilgisayarı; "Hayır" derseniz ekip listesinden '
+              'çıkar.'
+          : 'Ekip bilgisayarı müşteri bilgisayarlarına bağlanabilir ve ekibin '
+              'listesinde görünür.';
   return [
     Text('Merhaba $name. Bu bilgisayar GoTech ekibine mi ait?',
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
     const SizedBox(height: 10),
-    Text(
-        'Ekip bilgisayarı müşteri bilgisayarlarına bağlanabilir ve ekibin '
-        'listesinde görünür. Bir müşterinin bilgisayarını kuruyorsanız "Hayır" '
-        'deyin ve firma koduyla kaydedin.',
+    Text('$now Bir müşterinin bilgisayarını kuruyorsanız "Hayır" deyin.',
         style: TextStyle(fontSize: 13, color: muted)),
   ];
 }
@@ -227,4 +262,12 @@ Future<void> _keepSignedIn(GoTechAccount account) async {
   await bind.mainSetLocalOption(
       key: 'user_info', value: jsonEncode(account.user));
   gFFI.userModel.refreshCurrentUser();
+}
+
+/// A team computer kept its team member signed in for the address book; one that is no longer GoTech's must not.
+Future<void> _endKeptSession() async {
+  final token = bind.mainGetLocalOption(key: 'access_token');
+  if (token.isEmpty) return;
+  await goTechSignOut(token);
+  await gFFI.userModel.reset(resetOther: true);
 }

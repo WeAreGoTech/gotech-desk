@@ -61,8 +61,13 @@ Future<String?> _claimTeam(GoTechAccount account) async {
         '/api/desk/claim', await _claimPayload(null),
         token: account.token);
     if (status != _kHttpOk || body['ok'] != true) return _errorOf(body, status);
-    // the panel refuses a computer registered to a customer, so any registration kept here is stale
+    // the panel dropped whatever customer registration this computer had; the answer was the confirmation
     await _clearRegistration();
+    // a password GoTech set for a customer's unattended access is no longer stored anywhere but here
+    if (_get(kOptionGoTechUnattended) == 'Y') {
+      await bind.mainSetPermanentPasswordWithResult(password: '');
+      await _set(kOptionGoTechUnattended, '');
+    }
     await _set(kOptionGoTechTeamOwner, _str(body, 'ownerName'));
     await _set(kOptionGoTechTeamLabel, _str(body, 'label'));
     await _applySupport(body['support']);
@@ -71,6 +76,24 @@ Future<String?> _claimTeam(GoTechAccount account) async {
     return null;
   } catch (e) {
     debugPrint('GoTech team claim failed: $e');
+    return _kUnreachable;
+  }
+}
+
+/// A team member answered that this computer is not GoTech's: it leaves the team list (nothing happens when it was
+/// not on it), so the customer registration that follows goes through. Returns an error message, or null.
+Future<String?> goTechReleaseTeam(GoTechAccount account) async {
+  try {
+    final (status, body) = await _post(
+        '/api/desk/release', {'deskId': await _deskId()},
+        token: account.token);
+    if (status != _kHttpOk || body['ok'] != true) return _errorOf(body, status);
+    await _set(kOptionGoTechTeamOwner, '');
+    await _set(kOptionGoTechTeamLabel, '');
+    GoTechRegistration.load();
+    return null;
+  } catch (e) {
+    debugPrint('GoTech team release failed: $e');
     return _kUnreachable;
   }
 }

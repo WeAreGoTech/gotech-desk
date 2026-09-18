@@ -470,12 +470,14 @@ class GoTechRegistrationBar extends StatelessWidget {
                       style: TextStyle(fontSize: 13, color: textColor),
                     ),
             ),
-            if (!team || teamSignedOut)
-              TextButton(
-                onPressed: showGoTechLoginDialog,
-                style: TextButton.styleFrom(foregroundColor: kGoTechRed),
-                child: Text(registered ? 'Değiştir' : 'Giriş yap'),
-              ),
+            // a team computer can be turned back into a customer's from here, too
+            TextButton(
+              onPressed: showGoTechLoginDialog,
+              style: TextButton.styleFrom(foregroundColor: kGoTechRed),
+              child: Text(registered || (team && !teamSignedOut)
+                  ? 'Değiştir'
+                  : 'Giriş yap'),
+            ),
             if (registered)
               ElevatedButton.icon(
                 onPressed: showGoTechSupportDialog,
