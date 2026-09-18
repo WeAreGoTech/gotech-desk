@@ -741,6 +741,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           showGoTechRegisterDialog();
         }
       });
+      goTechStartHeartbeat();
     }
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();

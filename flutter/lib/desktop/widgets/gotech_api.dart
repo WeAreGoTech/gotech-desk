@@ -34,6 +34,8 @@ const _kUnattendedPasswordLength = 20;
 const _kPasswordChars =
     'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const _kRequestTimeout = Duration(seconds: 15);
+// closing the window only hides it, so the app keeps running and can keep the team list fresh
+const _kHeartbeatInterval = Duration(minutes: 5);
 const _kHttpOk = 200;
 const _kHttpUnauthorized = 401;
 const _kUnreachable =
@@ -357,6 +359,15 @@ Future<bool> goTechHeartbeat() async {
   return true;
 }
 
+Timer? _heartbeatTimer;
+
+/// Repeats the heartbeat while the app runs, so a computer the team adds gets through a customer's lock,
+/// and a panel edit shows up, without restarting the app.
+void goTechStartHeartbeat() {
+  _heartbeatTimer ??=
+      Timer.periodic(_kHeartbeatInterval, (_) => goTechHeartbeat());
+}
+
 /// Stores the GoTech team's computers and, while the lock is on, lets only them connect.
 Future<void> _applySupport(dynamic support) async {
   if (support is! Map) return;
@@ -364,20 +375,27 @@ Future<void> _applySupport(dynamic support) async {
       .map((id) => '$id'.replaceAll(' ', ''))
       .where((id) => id.isNotEmpty)
       .toList();
+  // a whitelist written from the old list is still ours to replace
+  final previousIds = _get(kOptionGoTechSupportIds);
   await _set(kOptionGoTechSupportIds, ids.join(','));
   final names = support['names'];
   await _set(kOptionGoTechSupportNames, names is Map ? jsonEncode(names) : '');
-  await applyGoTechLock();
+  await applyGoTechLock(previousIds: previousIds);
 }
 
 /// Writes (or clears) RustDesk's id whitelist from the team list.
-Future<void> applyGoTechLock() async {
-  final locked = _get(kOptionGoTechLockToTeam) != 'N';
+Future<void> applyGoTechLock({String? previousIds}) async {
+  // A team computer is not locked to the team: a teammate missing from its list, or added after it was
+  // fetched, got "ID blocked", which is what kept the team from connecting to each other.
+  final team = _get(kOptionGoTechDeviceToken).isEmpty &&
+      _get(kOptionGoTechTeamOwner).isNotEmpty;
+  final locked = !team && _get(kOptionGoTechLockToTeam) != 'N';
   final ids = _get(kOptionGoTechSupportIds);
   final current = bind.mainGetOptionSync(key: kOptionIdWhitelist);
   final wanted = locked ? ids : '';
   // only touch the option when we own its value, so a hand-written whitelist survives
-  if (current == wanted || (current.isNotEmpty && !locked && current != ids)) return;
+  final ours = current.isEmpty || current == ids || current == previousIds;
+  if (current == wanted || (!locked && !ours)) return;
   await bind.mainSetOption(key: kOptionIdWhitelist, value: wanted);
 }
 

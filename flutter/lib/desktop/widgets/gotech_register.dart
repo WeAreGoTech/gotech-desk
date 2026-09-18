@@ -9,7 +9,12 @@ import 'gotech_api.dart';
 import 'gotech_home.dart';
 
 export 'gotech_api.dart'
-    show GoTechRegistration, GoTechUpdate, goTechHeartbeat, isGoTechCustomerMachine;
+    show
+        GoTechRegistration,
+        GoTechUpdate,
+        goTechHeartbeat,
+        goTechStartHeartbeat,
+        isGoTechCustomerMachine;
 
 const _kOtherPerson = '__other__';
 const _kSharedComputer = '__shared__';
