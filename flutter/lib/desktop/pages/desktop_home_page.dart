@@ -25,7 +25,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
 import '../widgets/gotech_home.dart';
+import '../widgets/gotech_login.dart';
 import '../widgets/gotech_register.dart';
+import '../widgets/gotech_simple_home.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -201,7 +203,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       value: gFFI.serverModel,
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
-        child: ConnectionPage(header: header),
+        child: isOutgoingOnly
+            ? ConnectionPage(header: header)
+            : Obx(() => goTechShowsSimpleHome
+                ? GoTechSimpleHome(
+                    notices: Column(children: [
+                      buildPresetPasswordWarning(),
+                      Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+                    ]),
+                  )
+                : ConnectionPage(header: header)),
       ),
     );
   }
@@ -738,7 +749,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       GoTechRegistration.load();
       goTechHeartbeat().then((_) {
         if (mounted && GoTechRegistration.shouldPrompt) {
-          showGoTechRegisterDialog();
+          showGoTechLoginDialog();
         }
       });
       goTechStartHeartbeat();

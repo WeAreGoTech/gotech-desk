@@ -9,6 +9,8 @@ import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:get/get.dart';
 
+part 'gotech_account.dart';
+
 // Temporary sslip.io address until GoTech has a domain.
 const kGoTechApiBase =
     'https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io';
@@ -107,6 +109,11 @@ String? goTechSupportName(String peerId) {
 bool get isGoTechCustomerMachine =>
     GoTechRegistration.isRegistered && _get('gotech-full-ui') != 'Y';
 
+/// Everyone but a GoTech team computer gets the simple screen: a customer, or a computer nobody signed in
+/// on yet, only ever asks for help. The peer lists and the connect bar are for the team.
+bool get goTechShowsSimpleHome =>
+    !GoTechRegistration.isTeamMachine && _get('gotech-full-ui') != 'Y';
+
 /// Registration state shown on the home page.
 class GoTechRegistration {
   static final customerCode = ''.obs;
@@ -157,13 +164,17 @@ String _generatePassword() {
 Future<String> _deskId() async =>
     (await bind.mainGetMyId()).replaceAll(' ', '');
 
-/// Posts JSON and returns (statusCode, decoded body map).
+/// Posts JSON, with a panel session [token] when given, and returns (statusCode, decoded body map).
 Future<(int, Map<String, dynamic>)> _post(
-    String path, Map<String, dynamic> payload) async {
+    String path, Map<String, dynamic> payload,
+    {String? token}) async {
   final resp = await http
       .post(
         Uri.parse('${goTechApiBase()}$path'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(payload),
       )
       .timeout(_kRequestTimeout);

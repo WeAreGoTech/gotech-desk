@@ -7,12 +7,14 @@ import 'package:get/get.dart';
 
 import 'gotech_api.dart';
 import 'gotech_home.dart';
+import 'gotech_login.dart';
 
 export 'gotech_api.dart'
     show
         GoTechRegistration,
         GoTechUpdate,
         goTechHeartbeat,
+        goTechShowsSimpleHome,
         goTechStartHeartbeat,
         isGoTechCustomerMachine;
 
@@ -357,52 +359,6 @@ void showGoTechSupportDialog() {
   });
 }
 
-/// What a customer's computer shows instead of the peer lists: how support works.
-class GoTechCustomerHint extends StatelessWidget {
-  const GoTechCustomerHint({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
-    final locked =
-        bind.mainGetLocalOption(key: kOptionGoTechLockToTeam) != 'N';
-    final lines = [
-      (Icons.support_agent_rounded,
-          'Sorun yaşadığınızda "Destek iste" deyin, GoTech ekibi bağlansın.'),
-      (Icons.verified_user_outlined,
-          locked
-              ? 'Bu bilgisayara yalnızca GoTech ekibinin bilgisayarları bağlanabilir.'
-              : 'Bağlantı isteklerini ekranınızdan siz onaylıyorsunuz.'),
-      (Icons.password_rounded,
-          'Yukarıdaki kimlik ve parolayı yalnızca GoTech ekibiyle paylaşın.'),
-    ];
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (icon, text) in lines)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, size: 18, color: kGoTechRed),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(text,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: textColor?.withOpacity(0.75))),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Offers the newer build the panel published.
 class GoTechUpdateBar extends StatelessWidget {
   const GoTechUpdateBar({Key? key}) : super(key: key);
@@ -506,7 +462,7 @@ class GoTechRegistrationBar extends StatelessWidget {
                           style: TextStyle(fontSize: 13, color: textColor),
                         )
                       : Text(
-                      'Bu bilgisayar henüz bir GoTech müşterisine kayıtlı değil.',
+                      'GoTech hesabınızla giriş yapın.',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13, color: textColor),
@@ -514,9 +470,9 @@ class GoTechRegistrationBar extends StatelessWidget {
             ),
             if (!team)
               TextButton(
-                onPressed: showGoTechRegisterDialog,
+                onPressed: showGoTechLoginDialog,
                 style: TextButton.styleFrom(foregroundColor: kGoTechRed),
-                child: Text(registered ? 'Değiştir' : 'Kayıt ol'),
+                child: Text(registered ? 'Değiştir' : 'Giriş yap'),
               ),
             if (registered)
               ElevatedButton.icon(
