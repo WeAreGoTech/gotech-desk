@@ -2,6 +2,11 @@ name: GoTech Desk Windows x64
 
 on:
   workflow_dispatch:
+    inputs:
+      win7:
+        description: "Windows 7/8 derlemesi de (Rust 1.75, yankı engellemesiz)"
+        type: boolean
+        default: false
 
 env:
   LLVM_VERSION: "15.0.6"
@@ -35,11 +40,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant:
-          # Windows 10/11: voice call echo cancellation needs Rust 1.91+.
-          - { name: win10, rust: "1.91", build-args: "--echo-cancel", suffix: "" }
-          # Windows 7/8: Rust 1.75 is the last toolchain that still targets them.
-          - { name: win7, rust: "1.75", build-args: "", suffix: "-win7" }
+        # win10: Windows 10/11, voice call echo cancellation needs Rust 1.91+.
+        # win7: only on request; Rust 1.75 is the last toolchain that still targets Windows 7/8.
+        variant: ${{ fromJSON(inputs.win7 && '[{"name":"win10","rust":"1.91","build-args":"--echo-cancel","suffix":""},{"name":"win7","rust":"1.75","build-args":"","suffix":"-win7"}]' || '[{"name":"win10","rust":"1.91","build-args":"--echo-cancel","suffix":""}]') }}
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
