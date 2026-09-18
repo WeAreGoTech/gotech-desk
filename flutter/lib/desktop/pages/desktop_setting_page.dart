@@ -76,9 +76,7 @@ class DesktopSettingPage extends StatefulWidget {
         bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) != 'Y')
       SettingsTabKey.network,
     if (!bind.isIncomingOnly()) SettingsTabKey.display,
-    // only a team computer signs in here; elsewhere this login would skip the GoTech sign-in that
-    // tells the panel whose computer it is
-    if (!bind.isDisableAccount() && !goTechShowsSimpleHome)
+    if (!bind.isDisableAccount() && !isGoTechCustomerMachine)
       SettingsTabKey.account,
     if (isWindows &&
         !bind.isDisableSettings() &&
