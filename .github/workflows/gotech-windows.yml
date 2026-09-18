@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 
 env:
-  SCITER_RUST_VERSION: "1.75"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -30,9 +29,17 @@ jobs:
       target_version: Windows10
 
   build-windows:
-    name: x86_64-pc-windows-msvc
+    name: x86_64-pc-windows-msvc (${{ matrix.variant.name }})
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          # Windows 10/11: voice call echo cancellation needs Rust 1.91+.
+          - { name: win10, rust: "1.91", build-args: "--echo-cancel", suffix: "" }
+          # Windows 7/8: Rust 1.75 is the last toolchain that still targets them.
+          - { name: win7, rust: "1.75", build-args: "", suffix: "-win7" }
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
@@ -82,13 +89,13 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
-          toolchain: ${{ env.SCITER_RUST_VERSION }}
+          toolchain: ${{ matrix.variant.rust }}
           targets: x86_64-pc-windows-msvc
           components: "rustfmt"
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          prefix-key: windows-2022
+          prefix-key: windows-2022-${{ matrix.variant.name }}
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
@@ -116,9 +123,15 @@ jobs:
           fi
         shell: bash
 
+      # Keeps the old toolchain from resolving a dependency it cannot build.
+      - name: Drop the echo cancellation dependency
+        if: matrix.variant.name == 'win7'
+        shell: bash
+        run: sed -i '/sonora/d' Cargo.toml
+
       - name: Build GoTech Desk
         run: |
-          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
+          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram ${{ matrix.variant.build-args }}
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
 
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
@@ -170,7 +183,7 @@ jobs:
         if: env.SIGNPATH_ORGANIZATION_ID != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gotech-desk-unsigned-app
+          name: gotech-desk-unsigned-app${{ matrix.variant.suffix }}
           path: ./rustdesk
 
       - name: Sign app files
@@ -195,7 +208,7 @@ jobs:
           python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
           popd
           mkdir -p ./SignOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64.exe
+          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64${{ matrix.variant.suffix }}.exe
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
@@ -210,7 +223,7 @@ jobs:
           nuget restore msi.sln
           msbuild msi.sln -p:Configuration=Release -p:Platform=x64 /p:TargetVersion=Windows10
           $msi = Get-ChildItem ./Package/bin/*/Release/en-us/Package.msi | Select-Object -First 1
-          mv $msi.FullName ../../SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64.msi
+          mv $msi.FullName ../../SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64${{ matrix.variant.suffix }}.msi
           popd
 
       - name: Upload unsigned installers
@@ -218,7 +231,7 @@ jobs:
         if: env.SIGNPATH_ORGANIZATION_ID != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gotech-desk-unsigned-installers
+          name: gotech-desk-unsigned-installers${{ matrix.variant.suffix }}
           path: ./SignOutput
 
       - name: Sign installers
@@ -237,5 +250,5 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gotech-desk-windows-x86_64
+          name: gotech-desk-windows-x86_64${{ matrix.variant.suffix }}
           path: ./SignOutput

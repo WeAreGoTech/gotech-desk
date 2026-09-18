@@ -2582,11 +2582,15 @@ impl AudioHandler {
             discontinuity_generation,
         )?;
         let playback_status = playback_writer.status.clone();
+        #[cfg(feature = "echo-cancel")]
+        let (channels, sample_rate) = (config.channels as usize, config.sample_rate.0);
         let timeout = None;
         let stream = device.build_output_stream(
             config,
             move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
                 playback_writer.write_output(data);
+                #[cfg(feature = "echo-cancel")]
+                crate::echo_cancel::push_playback(data, channels, sample_rate);
             },
             err_fn,
             timeout,

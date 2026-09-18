@@ -1,5 +1,7 @@
 #[cfg(any(test, not(target_os = "linux")))]
 mod audio_resampler;
+#[cfg(all(feature = "echo-cancel", not(target_os = "linux")))]
+mod echo_cancel;
 mod keyboard;
 /// cbindgen:ignore
 pub mod platform;

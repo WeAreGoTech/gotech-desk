@@ -109,8 +109,18 @@ impl CaptureStatsReporter {
 pub(super) fn run_capture_encoder(context: CaptureEncoderContext, config: CaptureEncoderConfig) {
     let mut encoder = AudioEncoder::new(context.encoder);
     let mut state = CaptureEncoderState::new(config.sample_rate, config.encode_channel);
+    // A voice call switches capture to the microphone, which also hears the peer on the speaker.
+    #[cfg(feature = "echo-cancel")]
+    let mut echo_canceller = super::super::get_voice_call_input_device().map(|_| {
+        crate::echo_cancel::CaptureEchoCanceller::new(
+            config.sample_rate,
+            config.encode_channel as usize,
+        )
+    });
     loop {
         while let Some(packet) = state.next_packet(&context.receiver) {
+            #[cfg(feature = "echo-cancel")]
+            let packet = crate::echo_cancel::process_capture(echo_canceller.as_mut(), packet);
             send_f32(&packet, &mut encoder, &context.service);
             context.receiver.recycle(packet);
         }

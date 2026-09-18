@@ -146,6 +146,11 @@ def make_parser():
              'dlopen-ed in-process by the root service). Off by default.'
     )
     parser.add_argument(
+        '--echo-cancel',
+        action='store_true',
+        help='Windows/macOS: cancel the speaker echo in voice calls (needs Rust 1.91+)'
+    )
+    parser.add_argument(
         '--print-features',
         action='store_true',
         help='Print the cargo feature list these flags select, and exit without building. For a '
@@ -349,6 +354,8 @@ def get_features(args):
     if osx:
         if args.screencapturekit:
             features.append('screencapturekit')
+    if args.echo_cancel:
+        features.append('echo-cancel')
     print("features:", features)
     return features
 
