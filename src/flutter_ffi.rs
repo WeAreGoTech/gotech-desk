@@ -1131,6 +1131,15 @@ pub fn main_get_connect_status() -> String {
     }
 }
 
+pub fn main_get_incoming_sessions() -> String {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    match crate::ipc::get_incoming_sessions() {
+        Ok(sessions) => return sessions,
+        Err(err) => log::debug!("Failed to get incoming sessions: {err}"),
+    }
+    "[]".to_owned()
+}
+
 pub fn main_check_connect_status() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     start_option_status_sync(); // avoid multi calls

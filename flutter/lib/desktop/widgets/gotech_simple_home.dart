@@ -8,6 +8,7 @@ import 'gotech_api.dart';
 import 'gotech_home.dart';
 import 'gotech_login.dart';
 import 'gotech_register.dart';
+import 'gotech_sessions_view.dart';
 
 const _kSimpleHomeWidth = 520.0;
 const _kMainButtonHeight = 54.0;
@@ -36,12 +37,16 @@ class GoTechSimpleHome extends StatelessWidget {
                     loadPowered(context),
                     loadLogo(),
                     const SizedBox(height: 18),
+                    const GoTechActiveSessionsCard(),
                     Obx(() => GoTechRegistration.isRegistered
                         ? const _SupportCard()
                         : const _SignInCard()),
                     const SizedBox(height: 14),
                     const GoTechDeviceCard(),
                     const _AccessNote(),
+                    Obx(() => GoTechRegistration.isRegistered
+                        ? const GoTechHistoryCard()
+                        : const SizedBox.shrink()),
                     const GoTechUpdateBar(),
                     notices,
                   ],

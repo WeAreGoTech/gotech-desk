@@ -477,6 +477,9 @@ pub enum Data {
     CheckHwcodec,
     #[cfg(feature = "flutter")]
     VideoConnCount(Option<usize>),
+    /// UI -> server: the authorized incoming sessions, as JSON (see `server::incoming_sessions`).
+    #[cfg(feature = "flutter")]
+    IncomingSessions(Option<String>),
     // Although the key is not necessary, it is used to avoid hardcoding the key.
     WaylandScreencastRestoreToken((String, String)),
     HwCodecConfig(Option<String>),
@@ -900,6 +903,11 @@ async fn handle(data: Data, stream: &mut Connection) {
                 .filter(|x| x.conn_type == crate::server::AuthConnType::Remote)
                 .count();
             allow_err!(stream.send(&Data::VideoConnCount(Some(n))).await);
+        }
+        #[cfg(feature = "flutter")]
+        Data::IncomingSessions(None) => {
+            let sessions = crate::server::incoming_sessions::to_json();
+            allow_err!(stream.send(&Data::IncomingSessions(Some(sessions))).await);
         }
         Data::Config((name, value)) => match value {
             None => {
@@ -1625,6 +1633,19 @@ pub async fn set_config_async(name: &str, value: String) -> ResultType<()> {
     let mut c = connect(1000, "").await?;
     c.send_config(name, value).await?;
     Ok(())
+}
+
+/// Asked on a connection of its own, so a server that predates the query cannot upset the status poll.
+#[cfg(feature = "flutter")]
+#[tokio::main(flavor = "current_thread")]
+pub async fn get_incoming_sessions() -> ResultType<String> {
+    const TIMEOUT_MS: u64 = 1000;
+    let mut c = connect(TIMEOUT_MS, "").await?;
+    c.send(&Data::IncomingSessions(None)).await?;
+    match c.next_timeout(TIMEOUT_MS).await? {
+        Some(Data::IncomingSessions(Some(sessions))) => Ok(sessions),
+        _ => bail!("no incoming sessions reply"),
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]

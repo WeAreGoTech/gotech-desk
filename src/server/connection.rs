@@ -1897,6 +1897,7 @@ impl Connection {
             self.tx_from_authed.clone(),
             self.lr.clone(),
         ));
+        super::incoming_sessions::add(self.inner.id(), &self.lr.my_id, &self.lr.my_name, conn_type);
         self.session_last_recv_time = SESSIONS
             .lock()
             .unwrap()
@@ -4790,6 +4791,7 @@ impl Connection {
             }
             self.send(msg).await;
             self.voice_calling = accepted;
+            super::incoming_sessions::set_voice_call(self.inner.id(), accepted);
             if self.is_authed_view_camera_conn() {
                 if let Some(s) = self.server.upgrade() {
                     s.write().unwrap().subscribe(
@@ -4809,6 +4811,7 @@ impl Connection {
         // Notify the connection manager that the voice call has been closed.
         self.send_to_cm(Data::CloseVoiceCall("".to_owned()));
         self.voice_calling = false;
+        super::incoming_sessions::set_voice_call(self.inner.id(), false);
         if self.is_authed_view_camera_conn() {
             if let Some(s) = self.server.upgrade() {
                 s.write()
@@ -6947,6 +6950,7 @@ mod raii {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             clear_relative_mouse_active(self.0);
             AUTHED_CONNS.lock().unwrap().retain(|c| c.conn_id != self.0);
+            crate::server::incoming_sessions::remove(self.0);
             let remote_count = AUTHED_CONNS
                 .lock()
                 .unwrap()

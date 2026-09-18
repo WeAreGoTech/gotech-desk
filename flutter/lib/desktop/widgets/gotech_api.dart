@@ -10,6 +10,7 @@ import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:get/get.dart';
 
 part 'gotech_account.dart';
+part 'gotech_sessions.dart';
 
 // Temporary sslip.io address until GoTech has a domain.
 const kGoTechApiBase =
@@ -365,6 +366,8 @@ Future<bool> goTechHeartbeat() async {
       'deviceToken': token,
       'hostname': Platform.localHostname,
       'appVersion': await bind.mainGetVersion(),
+      // lets the panel trust the connection audit RustDesk posts, which carries only the ID and this
+      'deviceUuid': await bind.mainGetUuid(),
     });
     if (status == _kHttpUnauthorized) {
       await _clearRegistration();

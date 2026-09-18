@@ -856,6 +856,10 @@ class RustdeskImpl {
         () => js.context.callMethod('getByName', ["get_conn_status"]));
   }
 
+  Future<String> mainGetIncomingSessions({dynamic hint}) {
+    return Future.value('[]');
+  }
+
   Future<void> mainCheckConnectStatus({dynamic hint}) {
     throw UnimplementedError("mainCheckConnectStatus");
   }
