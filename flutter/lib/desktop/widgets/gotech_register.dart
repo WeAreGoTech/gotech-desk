@@ -416,6 +416,8 @@ class GoTechRegistrationBar extends StatelessWidget {
       final registered = GoTechRegistration.isRegistered;
       final team = GoTechRegistration.isTeamMachine;
       final who = GoTechRegistration.who;
+      // the panel session lapses after 30 days or a password change; the address book then stays empty
+      final teamSignedOut = team && gFFI.userModel.userName.value.isEmpty;
       return Container(
         margin: const EdgeInsets.only(top: 10),
         padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
@@ -468,7 +470,7 @@ class GoTechRegistrationBar extends StatelessWidget {
                       style: TextStyle(fontSize: 13, color: textColor),
                     ),
             ),
-            if (!team)
+            if (!team || teamSignedOut)
               TextButton(
                 onPressed: showGoTechLoginDialog,
                 style: TextButton.styleFrom(foregroundColor: kGoTechRed),

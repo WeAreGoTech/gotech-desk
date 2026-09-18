@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'gotech_api.dart';
 import 'gotech_home.dart';
@@ -43,6 +44,15 @@ void showGoTechLoginDialog() {
       });
     }
 
+    Future<String?> claimForTeam(GoTechAccount account) async {
+      final err = await goTechClaim(account);
+      if (err != null) return err;
+      await _keepSignedIn(account);
+      finish();
+      showToast('GoTech ekip bilgisayarı olarak giriş yapıldı');
+      return null;
+    }
+
     Future<String?> signIn() async {
       final email = emailController.text.trim();
       if (email.isEmpty || passwordController.text.isEmpty) {
@@ -52,6 +62,8 @@ void showGoTechLoginDialog() {
       final account = result.value;
       if (account == null) return result.error;
       if (account.isStaff) {
+        // a team computer already answered the question; it only needs the session back
+        if (GoTechRegistration.isTeamMachine) return claimForTeam(account);
         staff = account;
         return null;
       }
@@ -61,16 +73,6 @@ void showGoTechLoginDialog() {
       if (err != null) return err;
       finish();
       showToast('${GoTechRegistration.companyName.value} olarak kaydedildi');
-      return null;
-    }
-
-    Future<String?> claimForTeam() async {
-      final account = staff!;
-      final err = await goTechClaim(account);
-      if (err != null) return err;
-      await _keepSignedIn(account);
-      finish();
-      showToast('GoTech ekip bilgisayarı olarak kaydedildi');
       return null;
     }
 
@@ -132,13 +134,13 @@ void showGoTechLoginDialog() {
               dialogButton('Hayır, müşteri bilgisayarı',
                   onPressed: useCompanyCode, isOutline: true),
               dialogButton('Evet, ekip bilgisayarım',
-                  onPressed: () => run(claimForTeam)),
+                  onPressed: () => run(() => claimForTeam(staff!))),
             ]
           : [
               dialogButton('Şimdi değil', onPressed: later, isOutline: true),
               dialogButton('Giriş yap', onPressed: () => run(signIn)),
             ],
-      onSubmit: () => run(askTeam ? claimForTeam : signIn),
+      onSubmit: () => run(askTeam ? () => claimForTeam(staff!) : signIn),
       onCancel: later,
     );
   });
@@ -183,11 +185,24 @@ List<Widget> _signInStep({
       subtitle:
           const Text('Siz bilgisayar başında değilken de GoTech bağlanabilir.'),
     ),
-    TextButton(
-      onPressed: loading ? null : onCompanyCode,
-      style: TextButton.styleFrom(
-          foregroundColor: kGoTechRed, padding: EdgeInsets.zero),
-      child: const Text('Hesabınız yok mu? Firma koduyla kaydolun'),
+    Wrap(
+      spacing: 16,
+      children: [
+        TextButton(
+          // also where someone invited but never set a password gets a link
+          onPressed: () =>
+              launchUrl(Uri.parse('${goTechApiBase()}/sifremi-unuttum')),
+          style: TextButton.styleFrom(
+              foregroundColor: kGoTechRed, padding: EdgeInsets.zero),
+          child: const Text('Şifremi unuttum'),
+        ),
+        TextButton(
+          onPressed: loading ? null : onCompanyCode,
+          style: TextButton.styleFrom(
+              foregroundColor: kGoTechRed, padding: EdgeInsets.zero),
+          child: const Text('Hesabınız yok mu? Firma koduyla kaydolun'),
+        ),
+      ],
     ),
   ];
 }
