@@ -9,6 +9,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/desktop/widgets/gotech_login.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
@@ -2453,6 +2454,10 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
         });
       }
     }
+  } else if (uri.authority == "kur") {
+    // GoTech: a person's one-click setup link, gotechdesk://kur/<token>
+    goTechSetupFromLink(uri.path.substring(1));
+    return null;
   } else if (options.contains(uri.authority)) {
     command = '--${uri.authority}';
     if (uri.path.length > 1) {

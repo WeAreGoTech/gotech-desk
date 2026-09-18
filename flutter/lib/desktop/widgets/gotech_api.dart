@@ -279,11 +279,29 @@ Future<void> _clearRegistration() async {
 
 /// Refreshes what the panel knows about this device and what we show.
 /// Returns false when the panel no longer knows this device.
+/// The name of the file the person downloaded. The Windows exe is a packer that unpacks the app elsewhere
+/// and runs it with the original name in RUSTDESK_APPNAME (libs/portable), so the app's own name says nothing.
+String _downloadedFileName() {
+  final packed = Platform.environment['RUSTDESK_APPNAME'] ?? '';
+  return packed.isNotEmpty
+      ? packed
+      : File(Platform.resolvedExecutable).uri.pathSegments.last;
+}
+
+/// The token of a person's setup link, carried in the installer's name: GoTechDesk-kur-<token>.exe.
+String goTechPresetSetupToken() =>
+    RegExp(r'kur-([A-Za-z0-9_-]{20,100})')
+        .firstMatch(_downloadedFileName())
+        ?.group(1) ??
+    '';
+
 /// The company code an installer carried in its file name (GoTechDesk-799990.exe)
 /// or that an IT department dropped next to the app, so the customer types nothing.
 String goTechPresetCompanyCode() {
-  final fromName = RegExp(r'(\d{6})')
-      .firstMatch(File(Platform.resolvedExecutable).uri.pathSegments.last);
+  // a setup link's token can hold six digits in a row, which are no company code
+  final fromName = goTechPresetSetupToken().isEmpty
+      ? RegExp(r'(\d{6})').firstMatch(_downloadedFileName())
+      : null;
   if (fromName != null) return fromName.group(1)!;
   for (final path in [
     r'C:\ProgramData\GoTechDesk\firma.txt',

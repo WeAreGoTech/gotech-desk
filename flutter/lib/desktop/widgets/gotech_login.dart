@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,12 +12,57 @@ import 'gotech_home.dart';
 import 'gotech_register.dart';
 
 const _kDialogWidth = 420.0;
+const _kLoginDialogTag = 'gotech-login';
+// a gotechdesk:// link that started the app is handled once the home page is up
+const _kLinkDelay = Duration(seconds: 1);
+
+/// After the first heartbeat: a setup link's installer registers the computer on its own; any other computer
+/// that is nobody's yet asks for the sign-in.
+Future<void> goTechFirstRun() async {
+  if (GoTechRegistration.isRegistered || GoTechRegistration.isTeamMachine) {
+    return;
+  }
+  final token = goTechPresetSetupToken();
+  if (token.isNotEmpty && await goTechRunSetup(token)) return;
+  if (GoTechRegistration.shouldPrompt) showGoTechLoginDialog();
+}
+
+/// gotechdesk://kur/<token>: how a Mac gets its setup link, since the app cannot read its disk image's name.
+void goTechSetupFromLink(String token) {
+  Timer(_kLinkDelay, () => goTechRunSetup(token));
+}
+
+/// A setup link's token registers this computer with no password, or opens the sign-in with a team member's
+/// e-mail filled in. True when it was handled.
+Future<bool> goTechRunSetup(String token) async {
+  final result = await goTechSetup(token);
+  final email = result.staffEmail;
+  if (email != null) {
+    showGoTechLoginDialog(email: email);
+    return true;
+  }
+  final error = result.error;
+  if (!GoTechRegistration.isRegistered) {
+    showToast(error ?? 'Kurulum bağlantısı kullanılamadı.');
+    return false;
+  }
+  gFFI.dialogManager.dismissByTag(_kLoginDialogTag);
+  // a warning here means the computer is registered but its unattended password could not be set
+  showToast(error ??
+      '${[
+        GoTechRegistration.companyName.value,
+        GoTechRegistration.who
+      ].where((s) => s.isNotEmpty).join(' · ')} olarak kaydedildi');
+  return true;
+}
 
 /// What a computer nobody signed in on asks first: the panel e-mail and password. The account says whose
 /// computer it is, so there is no company code to find and no person to pick. A team member is asked whether
 /// it is a GoTech computer and can turn it either way: the team also signs in on customers' computers.
-void showGoTechLoginDialog() {
-  final emailController = TextEditingController();
+void showGoTechLoginDialog({String email = ''}) {
+  // one at a time: a second one would sit on top of the first
+  gFFI.dialogManager.dismissByTag(_kLoginDialogTag);
+  final emailController = TextEditingController(text: email);
   final passwordController = TextEditingController();
   var unattended = bind.mainGetLocalOption(key: kOptionGoTechUnattended) == 'Y';
   GoTechAccount? staff;
@@ -168,7 +214,7 @@ void showGoTechLoginDialog() {
       onSubmit: () => run(askTeam ? () => claimForTeam(staff!) : signIn),
       onCancel: later,
     );
-  });
+  }, tag: _kLoginDialogTag);
 }
 
 List<Widget> _signInStep({

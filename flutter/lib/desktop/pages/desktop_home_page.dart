@@ -748,9 +748,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (bind.isCustomClient() && !bind.isIncomingOnly() && !bind.isOutgoingOnly()) {
       GoTechRegistration.load();
       goTechHeartbeat().then((_) {
-        if (mounted && GoTechRegistration.shouldPrompt) {
-          showGoTechLoginDialog();
-        }
+        if (mounted) goTechFirstRun();
       });
       goTechStartHeartbeat();
     }

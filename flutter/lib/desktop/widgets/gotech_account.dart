@@ -99,38 +99,69 @@ Future<String?> goTechReleaseTeam(GoTechAccount account) async {
 }
 
 Future<String?> _claimCustomer(GoTechAccount account, bool unattended) async {
-  final wasUnattended = _get(kOptionGoTechUnattended) == 'Y';
   final password = unattended ? _generatePassword() : null;
   try {
     final (status, body) = await _post(
         '/api/desk/claim', await _claimPayload(password),
         token: account.token);
     if (status != _kHttpOk || body['ok'] != true) return _errorOf(body, status);
-    // the panel replaced the device token, so the new one is kept whatever happens next
-    await _set(kOptionGoTechCustomerCode, _str(body, 'customerCode'));
-    await _set(kOptionGoTechCompanyName, _str(body, 'companyName'));
-    await _set(kOptionGoTechPersonName, _str(body, 'personName'));
-    await _set(kOptionGoTechLabel, _str(body, 'label'));
-    await _set(kOptionGoTechDeviceToken, _str(body, 'deviceToken'));
-    // The password changes only now that the panel holds the new one (or none). The app cannot read the old
-    // one back, so changing it first and undoing on failure lost unattended access to a network error.
-    var applied = true;
-    if (password != null || wasUnattended) {
-      applied = await bind.mainSetPermanentPasswordWithResult(
-          password: password ?? '');
-    }
-    await _set(kOptionGoTechUnattended, unattended && applied ? 'Y' : '');
-    // whatever this computer was before, it is a customer's now
-    await _set(kOptionGoTechTeamOwner, '');
-    await _set(kOptionGoTechTeamLabel, '');
-    await _applySupport(body['support']);
-    await _applyUpdate(body['update']);
-    GoTechRegistration.load();
-    return applied
-        ? null
-        : 'Kayıt tamam ama kalıcı şifre ayarlanamadı; gözetimsiz erişim çalışmaz.';
+    return _keepCustomerRegistration(body, password);
   } catch (e) {
     debugPrint('GoTech claim failed: $e');
     return _kUnreachable;
   }
+}
+
+/// A person's one-click setup link (the installer's name, or gotechdesk://kur/<token>): the computer is registered to
+/// them with no password. A team member's link only gives back their e-mail to sign in with.
+Future<({String? error, String? staffEmail})> goTechSetup(String token) async {
+  try {
+    final payload = await _claimPayload(null)
+      ..remove('unattendedPassword')
+      ..['token'] = token;
+    final (status, body) = await _post('/api/desk/setup', payload);
+    if (status != _kHttpOk || body['ok'] != true) {
+      return (error: _errorOf(body, status), staffEmail: null);
+    }
+    if (body['kind'] == 'password') {
+      return (error: null, staffEmail: _str(body, 'email'));
+    }
+    return (
+      error: await _keepCustomerRegistration(body, null),
+      staffEmail: null
+    );
+  } catch (e) {
+    debugPrint('GoTech setup failed: $e');
+    return (error: _kUnreachable, staffEmail: null);
+  }
+}
+
+/// Keeps the customer registration the panel just made and switches the permanent password to the one it now holds
+/// (or none). Returns a warning when that password could not be set.
+Future<String?> _keepCustomerRegistration(
+    Map<String, dynamic> body, String? password) async {
+  final wasUnattended = _get(kOptionGoTechUnattended) == 'Y';
+  // the panel replaced the device token, so the new one is kept whatever happens next
+  await _set(kOptionGoTechCustomerCode, _str(body, 'customerCode'));
+  await _set(kOptionGoTechCompanyName, _str(body, 'companyName'));
+  await _set(kOptionGoTechPersonName, _str(body, 'personName'));
+  await _set(kOptionGoTechLabel, _str(body, 'label'));
+  await _set(kOptionGoTechDeviceToken, _str(body, 'deviceToken'));
+  // The password changes only now that the panel holds the new one (or none). The app cannot read the old
+  // one back, so changing it first and undoing on failure lost unattended access to a network error.
+  var applied = true;
+  if (password != null || wasUnattended) {
+    applied =
+        await bind.mainSetPermanentPasswordWithResult(password: password ?? '');
+  }
+  await _set(kOptionGoTechUnattended, password != null && applied ? 'Y' : '');
+  // whatever this computer was before, it is a customer's now
+  await _set(kOptionGoTechTeamOwner, '');
+  await _set(kOptionGoTechTeamLabel, '');
+  await _applySupport(body['support']);
+  await _applyUpdate(body['update']);
+  GoTechRegistration.load();
+  return applied
+      ? null
+      : 'Kayıt tamam ama kalıcı şifre ayarlanamadı; gözetimsiz erişim çalışmaz.';
 }
