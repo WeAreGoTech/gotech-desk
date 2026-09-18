@@ -493,7 +493,9 @@ class GoTechRegistrationBar extends StatelessWidget {
                     )
                   : team
                       ? Text(
-                          'GoTech ekip bilgisayarı · ${GoTechRegistration.teamOwner.value}',
+                          // the computer's own name, not the signed-in account: this line says
+                          // which machine you are sitting at, which its owner already knows
+                          'GoTech ekip bilgisayarı · ${GoTechRegistration.teamLabel.value.isNotEmpty ? GoTechRegistration.teamLabel.value : GoTechRegistration.teamOwner.value}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 13, color: textColor),

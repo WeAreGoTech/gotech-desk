@@ -22,6 +22,7 @@ const kOptionGoTechUnattended = 'gotech-unattended';
 const kOptionGoTechDeviceToken = 'gotech-device-token';
 const kOptionGoTechRegisterSkipped = 'gotech-register-skipped';
 const kOptionGoTechTeamOwner = 'gotech-team-owner';
+const kOptionGoTechTeamLabel = 'gotech-team-label';
 const kOptionGoTechSupportIds = 'gotech-support-ids';
 const kOptionGoTechSupportNames = 'gotech-support-names';
 const kOptionGoTechLockToTeam = 'gotech-lock-to-team';
@@ -111,6 +112,7 @@ class GoTechRegistration {
   static final personName = ''.obs;
   static final label = ''.obs;
   static final teamOwner = ''.obs;
+  static final teamLabel = ''.obs;
 
   static void load() {
     customerCode.value = _get(kOptionGoTechCustomerCode);
@@ -118,6 +120,7 @@ class GoTechRegistration {
     personName.value = _get(kOptionGoTechPersonName);
     label.value = _get(kOptionGoTechLabel);
     teamOwner.value = _get(kOptionGoTechTeamOwner);
+    teamLabel.value = _get(kOptionGoTechTeamLabel);
   }
 
   /// A GoTech computer: not a customer, known to the panel by the desk ID a team member added.
@@ -299,8 +302,10 @@ Future<void> _askIfTeamMachine() async {
     if (status != _kHttpOk) return;
     if (body['ok'] != true) {
       await _set(kOptionGoTechTeamOwner, '');
+      await _set(kOptionGoTechTeamLabel, '');
     } else {
       await _set(kOptionGoTechTeamOwner, _str(body, 'ownerName'));
+      await _set(kOptionGoTechTeamLabel, _str(body, 'label'));
       await _applySupport(body['support']);
       await _applyUpdate(body['update']);
     }
