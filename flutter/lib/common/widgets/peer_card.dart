@@ -136,8 +136,6 @@ class _PeerCardState extends State<_PeerCard>
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
     // the panel sends the person as the alias and the company as the only tag
-    final title = peer.alias.isNotEmpty ? peer.alias : formatID(peer.id);
-    final subtitle = peer.tags.isNotEmpty ? peer.tags.first.toString() : formatID(peer.id);
     final greyStyle = TextStyle(
         fontSize: 11,
         color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
@@ -189,7 +187,7 @@ class _PeerCardState extends State<_PeerCard>
                         getOnline(isPortrait ? 4 : 8, peer.online),
                         Expanded(
                             child: Text(
-                          subtitle,
+                          peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall,
                         )),
@@ -288,6 +286,9 @@ class _PeerCardState extends State<_PeerCard>
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
+    // the panel sends the person as the alias and the company as the only tag
+    final title = peer.alias.isNotEmpty ? peer.alias : formatID(peer.id);
+    final subtitle = peer.tags.isNotEmpty ? peer.tags.first.toString() : formatID(peer.id);
     final child = Card(
       color: Colors.transparent,
       elevation: 0,
@@ -354,9 +355,9 @@ class _PeerCardState extends State<_PeerCard>
                         getOnline(8, peer.online),
                         Expanded(
                             child: Text(
-                          peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
+                          subtitle,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: Theme.of(context).textTheme.bodySmall,
                         )),
                       ]).paddingSymmetric(vertical: 8)),
                       checkBoxOrActionMoreLandscape(peer, isTile: false),
