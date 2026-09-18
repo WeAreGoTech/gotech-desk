@@ -1946,7 +1946,10 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let (sender, mut receiver) = mpsc::unbounded_channel::<Data>();
     *handler.sender.write().unwrap() = Some(sender.clone());
-    let token = LocalConfig::get_option("access_token");
+    // GoTech: the account token belongs to the panel, not to the rendezvous server. RustDesk
+    // would hand it to hbbs to open a token-authenticated punch, which only Server Pro answers;
+    // our hbbs stays silent and the connection dies on "Failed to secure tcp".
+    let token = String::new();
     let key = crate::get_key(false).await;
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if handler.is_port_forward() {
