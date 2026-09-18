@@ -774,7 +774,7 @@ pub fn ensure_user_server_running() {
     if !std::path::Path::new(&format!("/Library/LaunchAgents/{label}.plist")).exists() {
         return;
     }
-    let target = format!("gui/{}/{}", unsafe { libc::getuid() }, label);
+    let target = format!("gui/{}/{}", unsafe { hbb_common::libc::getuid() }, label);
     match std::process::Command::new("/bin/launchctl")
         .args(["kickstart", &target])
         .status()
