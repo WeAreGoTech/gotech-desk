@@ -42,7 +42,9 @@ class PeerTabModel with ChangeNotifier {
     true,
     !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
     !(bind.isDisableAb() || bind.isDisableAccount()),
-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
+    // GoTech: device groups are a RustDesk Server Pro feature. The panel serves the address book
+    // instead, and this tab would only show a failed request.
+    false,
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {
