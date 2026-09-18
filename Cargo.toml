@@ -238,9 +238,9 @@ webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "80d5a2053
 webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "80d5a20532cf58f5d4d237c437a98ceb85ee40dc" }
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."
-ProductName = "RustDesk"
-FileDescription = "RustDesk Remote Desktop"
+LegalCopyright = "GoTech Desk, based on RustDesk (AGPL-3.0). Copyright © 2026 Purslane Tech Pte. Ltd."
+ProductName = "GoTech Desk"
+FileDescription = "GoTech Desk"
 OriginalFilename = "rustdesk.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
