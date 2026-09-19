@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
+import 'package:flutter_hbb/common/widgets/voice_call_controls.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/gotech_api.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
@@ -892,6 +893,8 @@ class _CmControlPanel extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        // built only during a call, so the next call starts from the service's unmuted state
+        if (client.inVoiceCall) buildCallControls(context),
         Offstage(
           offstage: !client.inVoiceCall,
           child: Row(
@@ -1132,6 +1135,69 @@ class _CmControlPanel extends StatelessWidget {
         ),
       ],
     ).marginOnly(bottom: buttonBottomMargin);
+  }
+
+  Widget buildCallControls(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: VoiceCallMute(
+            isCm: true,
+            builder: (muted, toggle) => buildButton(context,
+                color: muted ? Colors.red : MyTheme.accent,
+                onClick: toggle,
+                icon: Icon(muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    color: Colors.white, size: 14),
+                text: muted ? 'Unmute microphone' : 'Mute microphone',
+                textColor: Colors.white),
+          ),
+        ),
+        // the output device cannot be chosen on Linux yet
+        if (!isLinux)
+          Expanded(
+            child: buildButton(context,
+                color: MyTheme.accent,
+                onTapDown: (details) => showAudioOutputMenu(context, details),
+                icon: Icon(Icons.volume_up_rounded,
+                    color: Colors.white, size: 14),
+                text: 'Audio output',
+                textColor: Colors.white),
+          ),
+      ],
+    );
+  }
+
+  Future<void> showAudioOutputMenu(
+      BuildContext context, TapDownDetails details) async {
+    final info = await AudioOutput.getDevicesInfo(true);
+    final devices = info['devices'] as List<String>;
+    if (devices.isEmpty || !context.mounted) return;
+    final current = info['current'] as String;
+    final x = details.globalPosition.dx;
+    final y = details.globalPosition.dy;
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(x, y, x, y),
+      items: devices
+          .map((d) => PopupMenuItem<String>(
+                value: d,
+                height: 18,
+                padding: EdgeInsets.zero,
+                onTap: () => AudioOutput.setDevice(d, true),
+                child: IgnorePointer(
+                    child: RadioMenuButton(
+                  value: d,
+                  groupValue: current,
+                  onChanged: (_) {},
+                  child: Container(
+                    child: Text(d, overflow: TextOverflow.ellipsis, maxLines: 1),
+                    constraints: BoxConstraints(
+                        maxWidth: kConnectionManagerWindowSizeClosedChat.width - 80),
+                  ),
+                )),
+              ))
+          .toList(),
+    );
   }
 
   Widget buildButton(BuildContext context,

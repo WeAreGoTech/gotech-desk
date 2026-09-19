@@ -860,6 +860,28 @@ class RustdeskImpl {
     return Future.value('[]');
   }
 
+  Future<void> setVoiceCallMuted(
+      {required bool isCm, required bool muted, dynamic hint}) {
+    return Future.value();
+  }
+
+  Future<bool> getVoiceCallMuted({required bool isCm, dynamic hint}) {
+    return Future.value(false);
+  }
+
+  Future<List<String>> mainGetSoundOutputs({dynamic hint}) {
+    return Future.value([]);
+  }
+
+  Future<void> setAudioOutputDevice(
+      {required bool isCm, required String device, dynamic hint}) {
+    return Future.value();
+  }
+
+  Future<String> getAudioOutputDevice({required bool isCm, dynamic hint}) {
+    return Future.value('');
+  }
+
   Future<void> mainCheckConnectStatus({dynamic hint}) {
     throw UnimplementedError("mainCheckConnectStatus");
   }

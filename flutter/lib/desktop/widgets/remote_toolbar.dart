@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/toolbar.dart';
+import 'package:flutter_hbb/common/widgets/voice_call_controls.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/consts.dart';
@@ -2903,6 +2904,8 @@ class _VoiceCallMenu extends StatelessWidget {
       return [
         audioInput,
         Divider(),
+        _audioOutputMenu(),
+        Divider(),
         MenuButton(
           child: Text(translate('End call')),
           onPressed: () => bind.sessionCloseVoiceCall(sessionId: ffi.sessionId),
@@ -2917,17 +2920,65 @@ class _VoiceCallMenu extends StatelessWidget {
           case VoiceCallStatus.waitingForResponse:
             return buildCallWaiting(context);
           case VoiceCallStatus.connected:
-            return _IconSubmenuButton(
-              tooltip: 'Voice call',
-              svg: 'assets/voice_call.svg',
-              color: _ToolbarTheme.blueColor,
-              hoverColor: _ToolbarTheme.hoverBlueColor,
-              menuChildrenGetter: menuChildrenGetter,
-              ffi: ffi,
-            );
+            return Row(mainAxisSize: MainAxisSize.min, children: [
+              _muteButton(),
+              _IconSubmenuButton(
+                tooltip: 'Voice call',
+                svg: 'assets/voice_call.svg',
+                color: _ToolbarTheme.blueColor,
+                hoverColor: _ToolbarTheme.hoverBlueColor,
+                menuChildrenGetter: menuChildrenGetter,
+                ffi: ffi,
+              ),
+            ]);
           default:
             return Offstage();
         }
+      },
+    );
+  }
+
+  Widget _muteButton() {
+    return VoiceCallMute(
+      isCm: false,
+      builder: (muted, toggle) => _IconMenuButton(
+        icon: Icon(muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+            color: Colors.white, size: _ToolbarTheme.buttonSize * 0.7),
+        tooltip: muted ? 'Unmute microphone' : 'Mute microphone',
+        onPressed: toggle,
+        color: muted ? _ToolbarTheme.redColor : _ToolbarTheme.blueColor,
+        hoverColor:
+            muted ? _ToolbarTheme.hoverRedColor : _ToolbarTheme.hoverBlueColor,
+      ),
+    );
+  }
+
+  Widget _audioOutputMenu() {
+    return futureBuilder(
+      future: AudioOutput.getDevicesInfo(false),
+      hasData: (data) {
+        final devices = data['devices'] as List<String>;
+        if (devices.isEmpty) return const Offstage();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(translate('Audio output'),
+                    style: const TextStyle(fontWeight: FontWeight.bold))
+                .marginOnly(left: 12, top: 4, bottom: 4),
+            ...devices.map((d) => RdoMenuButton<String>(
+                  child: Container(
+                    child: Text(d, overflow: TextOverflow.ellipsis),
+                    constraints: BoxConstraints(maxWidth: 250),
+                  ),
+                  value: d,
+                  groupValue: data['current'] as String,
+                  onChanged: (v) {
+                    if (v != null) AudioOutput.setDevice(v, false);
+                  },
+                  ffi: ffi,
+                )),
+          ],
+        );
       },
     );
   }

@@ -956,6 +956,14 @@ async fn handle(data: Data, stream: &mut Connection) {
                     };
                 } else if name == "voice-call-input" {
                     value = crate::audio_service::get_voice_call_input_device();
+                } else if name == "voice-call-mute" {
+                    let muted = crate::audio_service::is_voice_call_muted();
+                    value = Some(if muted { "Y" } else { "N" }.to_owned());
+                } else if name == "audio-output" {
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        value = Some(crate::client::get_audio_output_device());
+                    }
                 } else if name == "unlock-pin" {
                     value = Some(Config::get_unlock_pin());
                 } else if name == "trusted-devices" {
@@ -994,6 +1002,11 @@ async fn handle(data: Data, stream: &mut Connection) {
                     Config::set_salt(&value);
                 } else if name == "voice-call-input" {
                     crate::audio_service::set_voice_call_input_device(Some(value), true);
+                } else if name == "voice-call-mute" {
+                    crate::audio_service::set_voice_call_muted(value == "Y");
+                } else if name == "audio-output" {
+                    #[cfg(not(target_os = "linux"))]
+                    crate::client::set_audio_output_device(value);
                 } else if name == "unlock-pin" {
                     Config::set_unlock_pin(&value);
                 } else {

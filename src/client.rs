@@ -2374,11 +2374,9 @@ impl AudioHandler {
     /// Start the audio playback.
     #[cfg(not(target_os = "linux"))]
     fn start_audio(&mut self, format0: AudioFormat) -> ResultType<()> {
-        let device = AUDIO_HOST
-            .default_output_device()
-            .with_context(|| "Failed to get default output device")?;
+        let device = output_device()?;
         log::info!(
-            "Using default output device: \"{}\"",
+            "Using output device: \"{}\"",
             device.name().unwrap_or("".to_owned())
         );
         let config = device.default_output_config().map_err(|e| anyhow!(e))?;
@@ -4134,12 +4132,90 @@ pub fn start_video_thread<F, T>(
     });
 }
 
+#[cfg(not(target_os = "linux"))]
+const OPTION_AUDIO_OUTPUT: &str = "audio-output";
+
+/// The playback device picked in a voice call (by name), empty for the system default.
+#[cfg(not(target_os = "linux"))]
+pub fn get_audio_output_device() -> String {
+    LocalConfig::get_option(OPTION_AUDIO_OUTPUT)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn set_audio_output_device(device: String) {
+    LocalConfig::set_option(OPTION_AUDIO_OUTPUT.to_owned(), device);
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn get_sound_outputs() -> Vec<String> {
+    match AUDIO_HOST.output_devices() {
+        Ok(devices) => devices.filter_map(|d| d.name().ok()).collect(),
+        Err(err) => {
+            log::warn!("Failed to list audio output devices: {err}");
+            Vec::new()
+        }
+    }
+}
+
+/// The chosen output device, or the default one when none is chosen or it is gone.
+#[cfg(not(target_os = "linux"))]
+fn output_device() -> ResultType<Device> {
+    let name = get_audio_output_device();
+    if !name.is_empty() {
+        let chosen = AUDIO_HOST
+            .output_devices()
+            .ok()
+            .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(&name)));
+        if let Some(device) = chosen {
+            return Ok(device);
+        }
+        log::warn!("Audio output device \"{name}\" not found, using the default");
+    }
+    AUDIO_HOST
+        .default_output_device()
+        .with_context(|| "Failed to get default output device")
+}
+
+/// Notices, at most once a second, that another output device was picked during playback.
+#[cfg(not(target_os = "linux"))]
+struct OutputDeviceWatch {
+    device: String,
+    checked: Instant,
+}
+
+#[cfg(not(target_os = "linux"))]
+impl OutputDeviceWatch {
+    const INTERVAL: Duration = Duration::from_secs(1);
+
+    fn new() -> Self {
+        Self {
+            device: get_audio_output_device(),
+            checked: Instant::now(),
+        }
+    }
+
+    fn changed(&mut self) -> bool {
+        if self.checked.elapsed() < Self::INTERVAL {
+            return false;
+        }
+        self.checked = Instant::now();
+        let device = get_audio_output_device();
+        if device == self.device {
+            return false;
+        }
+        self.device = device;
+        true
+    }
+}
+
 /// Start an audio thread
 /// Return a audio [`MediaSender`]
 pub fn start_audio_thread() -> MediaSender {
     let (audio_sender, audio_receiver) = mpsc::channel::<MediaData>();
     std::thread::spawn(move || {
         let mut audio_handler = AudioHandler::default();
+        #[cfg(not(target_os = "linux"))]
+        let (mut output_watch, mut last_format) = (OutputDeviceWatch::new(), None::<AudioFormat>);
         loop {
             #[cfg(target_os = "windows")]
             let received = audio_handler.receive_audio(&audio_receiver);
@@ -4148,10 +4224,21 @@ pub fn start_audio_thread() -> MediaSender {
             if let Ok(data) = received {
                 match data {
                     MediaData::AudioFrame(af) => {
+                        // a new output device needs a new stream: replay the format to open one there
+                        #[cfg(not(target_os = "linux"))]
+                        if output_watch.changed() {
+                            if let Some(f) = last_format.clone() {
+                                audio_handler.handle_format(f);
+                            }
+                        }
                         audio_handler.handle_frame(*af);
                     }
                     MediaData::AudioFormat(f) => {
                         log::debug!("recved audio format, sample rate={}", f.sample_rate);
+                        #[cfg(not(target_os = "linux"))]
+                        {
+                            last_format = Some(f.clone());
+                        }
                         audio_handler.handle_format(f);
                     }
                     _ => {}

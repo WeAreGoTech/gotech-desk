@@ -1753,6 +1753,56 @@ pub fn get_voice_call_input_device(_is_cm: bool) -> String {
     "".to_owned()
 }
 
+pub fn set_voice_call_muted(_is_cm: bool, _muted: bool) {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if _is_cm {
+        let _ = crate::ipc::set_config("voice-call-mute", if _muted { "Y" } else { "N" }.to_owned());
+    } else {
+        crate::audio_service::set_voice_call_muted(_muted);
+    }
+}
+
+pub fn get_voice_call_muted(_is_cm: bool) -> bool {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if _is_cm {
+        matches!(crate::ipc::get_config("voice-call-mute"), Ok(Some(v)) if v == "Y")
+    } else {
+        crate::audio_service::is_voice_call_muted()
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    false
+}
+
+pub fn main_get_sound_outputs() -> Vec<String> {
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ios")))]
+    return crate::client::get_sound_outputs();
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ios"))]
+    Vec::new()
+}
+
+pub fn set_audio_output_device(_is_cm: bool, _device: String) {
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ios")))]
+    if _is_cm {
+        let _ = crate::ipc::set_config("audio-output", _device);
+    } else {
+        crate::client::set_audio_output_device(_device);
+    }
+}
+
+pub fn get_audio_output_device(_is_cm: bool) -> String {
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ios")))]
+    if _is_cm {
+        match crate::ipc::get_config("audio-output") {
+            Ok(Some(device)) => device,
+            _ => "".to_owned(),
+        }
+    } else {
+        crate::client::get_audio_output_device()
+    }
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ios"))]
+    "".to_owned()
+}
+
 pub fn main_get_last_remote_id() -> String {
     LocalConfig::get_remote_id()
 }

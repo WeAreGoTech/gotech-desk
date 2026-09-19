@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub const NAME: &'static str = "audio";
 pub const AUDIO_DATA_SIZE_U8: usize = 960 * 4; // 10ms in 48000 stereo
 static RESTARTING: AtomicBool = AtomicBool::new(false);
+static VOICE_CALL_MUTED: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
     static ref VOICE_CALL_INPUT_DEVICE: Arc::<Mutex::<Option<String>>> = Default::default();
@@ -47,8 +48,20 @@ pub fn get_voice_call_input_device() -> Option<String> {
     VOICE_CALL_INPUT_DEVICE.lock().unwrap().clone()
 }
 
+/// Stops sending the microphone during a voice call; cleared when the call ends.
+pub fn set_voice_call_muted(muted: bool) {
+    VOICE_CALL_MUTED.store(muted, Ordering::Relaxed);
+}
+
+pub fn is_voice_call_muted() -> bool {
+    VOICE_CALL_MUTED.load(Ordering::Relaxed)
+}
+
 #[inline]
 pub fn set_voice_call_input_device(device: Option<String>, set_if_present: bool) {
+    if device.is_none() {
+        set_voice_call_muted(false);
+    }
     if !set_if_present && VOICE_CALL_INPUT_DEVICE.lock().unwrap().is_some() {
         return;
     }
@@ -796,6 +809,9 @@ impl AudioEncoder {
 }
 
 fn send_f32(data: &[f32], encoder: &mut AudioEncoder, sp: &GenericService) {
+    if is_voice_call_muted() && VOICE_CALL_INPUT_DEVICE.lock().unwrap().is_some() {
+        return;
+    }
     if !encoder.should_encode(data) {
         return;
     }
