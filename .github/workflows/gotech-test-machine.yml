@@ -23,7 +23,7 @@ on:
         required: true
       installer_url:
         description: "MSI adresi"
-        default: "https://github.com/WeAreGoTech/gotech-desk/releases/download/gotech-1.5.0-test3/GoTechDesk-1.5.0-x86_64.msi"
+        default: "https://github.com/WeAreGoTech/gotech-desk/releases/download/gotech-1.6.0/GoTechDesk-1.6.0-x86_64.msi"
         required: true
 
 env:
@@ -74,7 +74,7 @@ jobs:
             deskId = $env:DESK_ID
             hostname = "BULUT-TEST-PC"
             platform = "windows"
-            appVersion = "1.5.0"
+            appVersion = "1.6.0"
             unattendedPassword = $pw
             personId = $null
             personName = $null
