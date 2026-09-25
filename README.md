@@ -9,7 +9,7 @@ firmanın sunucusundan geçmez, kendi makinemize (rendezvous + relay) gider.
 
 - Müşteri bilgisayarları: **Windows**
 - GoTech ekibi: **Windows / macOS**
-- Panel: [GoTech Paneli](https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io) — bilgisayarlar, destek talepleri, tek tıkla bağlanma
+- Panel: [GoTech Paneli](https://gotech-web-31-40-199-183.sslip.io) — bilgisayarlar, destek talepleri, tek tıkla bağlanma
 
 ---
 

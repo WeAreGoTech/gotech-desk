@@ -12,9 +12,8 @@ import 'package:get/get.dart';
 part 'gotech_account.dart';
 part 'gotech_sessions.dart';
 
-// Temporary sslip.io address until GoTech has a domain.
-const kGoTechApiBase =
-    'https://gotech-web-3biyyk-fc72c7-152-53-142-222.sslip.io';
+// Temporary sslip.io address until GoTech has a domain. SN404 (31.40.199.183).
+const kGoTechApiBase = 'https://gotech-web-31-40-199-183.sslip.io';
 
 const kOptionGoTechApiUrl = 'gotech-api-url';
 const kOptionGoTechCustomerCode = 'gotech-customer-code';
