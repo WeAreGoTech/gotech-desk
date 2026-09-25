@@ -114,8 +114,7 @@ class GoTechUpdateBar extends StatelessWidget {
             Expanded(
               child: Text(
                 'Yeni sürüm hazır (${GoTechUpdate.version.value}). '
-                '${inPlace ? 'Güncelleyince uygulama kendini yeniden başlatır' : 'İndirip kurduğunuzda'}; '
-                'ayarlarınız korunur.',
+                '${inPlace ? 'Güncelleyince uygulama kendini yeniden başlatır; ayarlarınız korunur.' : 'İndirip kurduğunuzda ayarlarınız korunur.'}',
                 maxLines: 2,
                 style: const TextStyle(fontSize: 13),
               ),
