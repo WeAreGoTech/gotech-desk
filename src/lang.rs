@@ -132,6 +132,11 @@ fn resolve_lang(saved_lang: &str, locale: &str, cjk_fallback: bool) -> String {
     if cjk_fallback && is_cjk_lang(&lang) {
         return "en".to_owned();
     }
+    // GoTech: customers are Turkish; default to Turkish instead of the OS locale below when nobody has
+    // picked a language in Settings yet (saved_lang above still wins once they do).
+    if lang.is_empty() && !cjk_fallback {
+        return "tr".to_owned();
+    }
     if lang.is_empty() {
         // zh_CN on Linux, zh-Hans-CN on mac, zh_CN_#Hans on Android
         if locale.starts_with("zh") {
@@ -337,11 +342,18 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_lang_preserves_cjk_when_target_allows_cjk() {
+    fn test_resolve_lang_keeps_an_explicit_choice() {
         use super::resolve_lang as f;
 
         assert_eq!(f("zh-cn", "en-US", false), "zh-cn");
-        assert_eq!(f("", "zh_TW", false), "zh-tw");
-        assert_eq!(f("", "ja-JP", false), "ja");
+    }
+
+    #[test]
+    fn test_resolve_lang_defaults_to_turkish_without_a_saved_choice() {
+        use super::resolve_lang as f;
+
+        assert_eq!(f("", "zh_TW", false), "tr");
+        assert_eq!(f("", "ja-JP", false), "tr");
+        assert_eq!(f("", "en-US", false), "tr");
     }
 }

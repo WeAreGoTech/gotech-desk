@@ -4,6 +4,7 @@ import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 
+import 'gotech_account_menu.dart';
 import 'gotech_api.dart';
 import 'gotech_home.dart';
 import 'gotech_login.dart';
@@ -27,32 +28,40 @@ class GoTechSimpleHome extends StatelessWidget {
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: _kSimpleHomeWidth),
-                child: Column(
-                  children: [
-                    loadPowered(context),
-                    loadLogo(),
-                    const SizedBox(height: 18),
-                    const GoTechActiveSessionsCard(),
-                    Obx(() => GoTechRegistration.isRegistered
-                        ? const _SupportCard()
-                        : const _SignInCard()),
-                    const SizedBox(height: 14),
-                    const GoTechDeviceCard(),
-                    const _AccessNote(),
-                    Obx(() => GoTechRegistration.isRegistered
-                        ? const GoTechHistoryCard()
-                        : const SizedBox.shrink()),
-                    const GoTechUpdateBar(),
-                    notices,
-                  ],
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(maxWidth: _kSimpleHomeWidth),
+                      child: Column(
+                        children: [
+                          loadPowered(context),
+                          loadLogo(),
+                          const SizedBox(height: 18),
+                          const GoTechActiveSessionsCard(),
+                          Obx(() => GoTechRegistration.isRegistered
+                              ? const _SupportCard()
+                              : const _SignInCard()),
+                          const SizedBox(height: 14),
+                          const GoTechDeviceCard(),
+                          const _AccessNote(),
+                          Obx(() => GoTechRegistration.isRegistered
+                              ? const GoTechHistoryCard()
+                              : const SizedBox.shrink()),
+                          const GoTechUpdateBar(),
+                          notices,
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const Positioned(top: 8, right: 12, child: GoTechAccountButton()),
+            ],
           ),
         ),
         const Divider(height: 1),
@@ -143,8 +152,8 @@ class _SupportCard extends StatelessWidget {
           icon: Icons.support_agent_rounded,
           action: 'Destek iste',
           onAction: showGoTechSupportDialog,
-          link: 'Bu bilgisayarın kaydını değiştir',
-          onLink: showGoTechLoginDialog,
+          link: 'Çıkış yap',
+          onLink: showGoTechSignOutDialog,
         ));
   }
 }

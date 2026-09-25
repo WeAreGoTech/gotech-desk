@@ -5,6 +5,7 @@ import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 
+import 'gotech_account_menu.dart';
 import 'gotech_api.dart';
 import 'gotech_home.dart';
 import 'gotech_login.dart';
@@ -471,13 +472,14 @@ class GoTechRegistrationBar extends StatelessWidget {
                     ),
             ),
             // a team computer can be turned back into a customer's from here, too
-            TextButton(
-              onPressed: showGoTechLoginDialog,
-              style: TextButton.styleFrom(foregroundColor: kGoTechRed),
-              child: Text(registered || (team && !teamSignedOut)
-                  ? 'Değiştir'
-                  : 'Giriş yap'),
-            ),
+            if (registered || (team && !teamSignedOut))
+              const GoTechAccountButton()
+            else
+              TextButton(
+                onPressed: showGoTechLoginDialog,
+                style: TextButton.styleFrom(foregroundColor: kGoTechRed),
+                child: const Text('Giriş yap'),
+              ),
             if (registered)
               ElevatedButton.icon(
                 onPressed: showGoTechSupportDialog,

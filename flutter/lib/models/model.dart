@@ -3706,7 +3706,11 @@ class ElevationModel with ChangeNotifier {
     _running = false;
   }
 
-  onPortableServiceRunning(bool running) => _running = running;
+  onPortableServiceRunning(bool running) {
+    _running = running;
+    // GoTechInputNotice drops its "not installed" warning once elevation took
+    notifyListeners();
+  }
 }
 
 // The index values of `ConnType` are same as rust protobuf.

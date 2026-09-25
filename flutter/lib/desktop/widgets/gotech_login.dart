@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,11 +20,15 @@ const _kLinkDelay = Duration(seconds: 1);
 /// After the first heartbeat: a setup link's installer registers the computer on its own; any other computer
 /// that is nobody's yet asks for the sign-in.
 Future<void> goTechFirstRun() async {
+  if (await goTechInstallDownload()) return;
   if (GoTechRegistration.isRegistered || GoTechRegistration.isTeamMachine) {
     return;
   }
   final token = goTechPresetSetupToken();
-  if (token.isNotEmpty && await goTechRunSetup(token)) return;
+  if (token.isNotEmpty) {
+    await goTechForgetPresetToken();
+    if (await goTechRunSetup(token)) return;
+  }
   if (GoTechRegistration.shouldPrompt) showGoTechLoginDialog();
 }
 
@@ -53,7 +58,21 @@ Future<bool> goTechRunSetup(String token) async {
         GoTechRegistration.companyName.value,
         GoTechRegistration.who
       ].where((s) => s.isNotEmpty).join(' · ')} olarak kaydedildi');
+  _installIfPortable();
   return true;
+}
+
+/// A one-click setup link should leave the computer installed, not just its account tied: otherwise the
+/// portable exe keeps showing the "click Install" banner on every start. Same gating as that banner
+/// (desktop_home_page.dart), triggered automatically instead of waiting for the person to notice it.
+void _installIfPortable() {
+  if (!isWindows || bind.isDisableInstallation() || bind.mainIsInstalled()) {
+    return;
+  }
+  Timer(_kLinkDelay, () async {
+    await rustDeskWinManager.closeAllSubWindows();
+    bind.mainGotoInstall();
+  });
 }
 
 /// What a computer nobody signed in on asks first: the panel e-mail and password. The account says whose
@@ -316,4 +335,66 @@ Future<void> _endKeptSession() async {
   if (token.isEmpty) return;
   await goTechSignOut(token);
   await gFFI.userModel.reset(resetOther: true);
+}
+
+/// Asks first, then signs this computer out: its registration and any team session on it are dropped, and the
+/// sign-in shows again for whoever uses it next.
+void showGoTechSignOutDialog() {
+  var errMsg = '';
+  var loading = false;
+  gFFI.dialogManager.show((setState, close, context) {
+    Future<void> signOut() async {
+      if (loading) return;
+      setState(() {
+        loading = true;
+        errMsg = '';
+      });
+      final err = await goTechSignOutComputer();
+      if (err != null) {
+        setState(() {
+          loading = false;
+          errMsg = err;
+        });
+        return;
+      }
+      await _endKeptSession();
+      close();
+      showToast('Çıkış yapıldı');
+      showGoTechLoginDialog();
+    }
+
+    void cancel() {
+      if (!loading) close();
+    }
+
+    return CustomAlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.logout_rounded, color: kGoTechRed),
+          const Text('Çıkış yap').paddingOnly(left: 10),
+        ],
+      ),
+      content: SizedBox(
+        width: _kDialogWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Bu bilgisayarın kaydı kaldırılır. Tekrar destek almak '
+                'için hesabınızla yeniden giriş yapmanız gerekir.'),
+            if (errMsg.isNotEmpty)
+              Text(errMsg, style: const TextStyle(color: kGoTechRed))
+                  .marginOnly(top: 8),
+            if (loading) const LinearProgressIndicator().marginOnly(top: 8),
+          ],
+        ),
+      ),
+      actions: [
+        dialogButton('Vazgeç', onPressed: cancel, isOutline: true),
+        dialogButton('Çıkış yap', onPressed: signOut),
+      ],
+      onSubmit: signOut,
+      onCancel: cancel,
+    );
+  });
 }

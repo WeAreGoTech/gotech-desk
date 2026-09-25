@@ -26,6 +26,11 @@ const kOptionGoTechDeviceToken = 'gotech-device-token';
 const kOptionGoTechRegisterSkipped = 'gotech-register-skipped';
 const kOptionGoTechTeamOwner = 'gotech-team-owner';
 const kOptionGoTechTeamLabel = 'gotech-team-label';
+// the e-mail of the account that signed this computer in, shown in the account menu
+const kOptionGoTechEmail = 'gotech-email';
+const _kOptionPresetToken = 'gotech-preset-token';
+const _kOptionPresetCode = 'gotech-preset-code';
+const _kOptionInstallOffered = 'gotech-install-offered';
 const kOptionGoTechSupportIds = 'gotech-support-ids';
 const kOptionGoTechSupportNames = 'gotech-support-names';
 const kOptionGoTechLockToTeam = 'gotech-lock-to-team';
@@ -123,6 +128,7 @@ class GoTechRegistration {
   static final label = ''.obs;
   static final teamOwner = ''.obs;
   static final teamLabel = ''.obs;
+  static final email = ''.obs;
 
   static void load() {
     customerCode.value = _get(kOptionGoTechCustomerCode);
@@ -131,6 +137,7 @@ class GoTechRegistration {
     label.value = _get(kOptionGoTechLabel);
     teamOwner.value = _get(kOptionGoTechTeamOwner);
     teamLabel.value = _get(kOptionGoTechTeamLabel);
+    email.value = _get(kOptionGoTechEmail);
   }
 
   /// A GoTech computer: not a customer, known to the panel by the desk ID a team member added.
@@ -255,6 +262,8 @@ Future<String?> goTechRegister({
     await _set(kOptionGoTechLabel, _str(body, 'label'));
     await _set(kOptionGoTechDeviceToken, _str(body, 'deviceToken'));
     await _set(kOptionGoTechUnattended, unattended ? 'Y' : '');
+    // registered by company code, not by an account
+    await _set(kOptionGoTechEmail, '');
     GoTechRegistration.load();
     return null;
   } catch (e) {
@@ -265,6 +274,11 @@ Future<String?> goTechRegister({
 }
 
 Future<void> _clearRegistration() async {
+  // the unattended password was GoTech's; a computer signed out (here or from the panel) must not keep it
+  if (_get(kOptionGoTechUnattended) == 'Y') {
+    await bind.mainSetPermanentPasswordWithResult(password: '');
+    await _set(kOptionGoTechUnattended, '');
+  }
   for (final key in [
     kOptionGoTechCustomerCode,
     kOptionGoTechCompanyName,
@@ -272,6 +286,7 @@ Future<void> _clearRegistration() async {
     kOptionGoTechLabel,
     kOptionGoTechDeviceToken,
     kOptionGoTechRegisterSkipped,
+    kOptionGoTechEmail,
   ]) {
     await _set(key, '');
   }
@@ -289,12 +304,35 @@ String _downloadedFileName() {
       : File(Platform.resolvedExecutable).uri.pathSegments.last;
 }
 
-/// The token of a person's setup link, carried in the installer's name: GoTechDesk-kur-<token>.exe.
+/// The token of a person's setup link, carried in the installer's name: GoTechDesk-kur-<token>.exe, or kept
+/// for the installed copy by [goTechInstallDownload].
 String goTechPresetSetupToken() =>
     RegExp(r'kur-([A-Za-z0-9_-]{20,100})')
         .firstMatch(_downloadedFileName())
         ?.group(1) ??
-    '';
+    _get(_kOptionPresetToken);
+
+/// A setup link is spent once tried; the installed copy must not try it again at every start.
+Future<void> goTechForgetPresetToken() => _set(_kOptionPresetToken, '');
+
+/// The downloaded exe installs itself at its first start; only one named "...-portable.exe" (a separate
+/// download on the panel) keeps running without installing. Offered once: someone without admin rights
+/// who cancels or picks "Run without install" gets the app as before. True when the installer took over.
+Future<bool> goTechInstallDownload() async {
+  if (!Platform.isWindows ||
+      bind.isDisableInstallation() ||
+      bind.mainIsInstalled() ||
+      _get(_kOptionInstallOffered) == 'Y' ||
+      _downloadedFileName().toLowerCase().contains('portable')) {
+    return false;
+  }
+  // the installed copy is named GoTechDesk.exe and cannot read what this file's name carried
+  await _set(_kOptionPresetToken, goTechPresetSetupToken());
+  await _set(_kOptionPresetCode, goTechPresetCompanyCode());
+  await _set(_kOptionInstallOffered, 'Y');
+  bind.mainGotoInstall();
+  return true;
+}
 
 /// The company code an installer carried in its file name (GoTechDesk-799990.exe)
 /// or that an IT department dropped next to the app, so the customer types nothing.
@@ -304,6 +342,8 @@ String goTechPresetCompanyCode() {
       ? RegExp(r'(\d{6})').firstMatch(_downloadedFileName())
       : null;
   if (fromName != null) return fromName.group(1)!;
+  final kept = _get(_kOptionPresetCode);
+  if (kept.isNotEmpty) return kept;
   for (final path in [
     r'C:\ProgramData\GoTechDesk\firma.txt',
     '/Library/Application Support/GoTechDesk/firma.txt',

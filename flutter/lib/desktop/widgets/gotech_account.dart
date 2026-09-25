@@ -43,8 +43,18 @@ Future<void> goTechSignOut(String token) async {
 /// Tells the panel whose computer this is by the signed-in account and keeps the answer: a customer's
 /// computer is registered to their company as theirs, a team member's becomes a GoTech computer.
 /// Returns an error message, or null on success.
-Future<String?> goTechClaim(GoTechAccount account, {bool unattended = false}) =>
-    account.isStaff ? _claimTeam(account) : _claimCustomer(account, unattended);
+Future<String?> goTechClaim(GoTechAccount account,
+    {bool unattended = false}) async {
+  final err = account.isStaff
+      ? await _claimTeam(account)
+      : await _claimCustomer(account, unattended);
+  // a warning can come with a registration that went through, so the state decides
+  if (GoTechRegistration.isRegistered || GoTechRegistration.isTeamMachine) {
+    await _set(kOptionGoTechEmail, '${account.user['email'] ?? ''}');
+    GoTechRegistration.load();
+  }
+  return err;
+}
 
 Future<Map<String, dynamic>> _claimPayload(String? unattendedPassword) async =>
     {
@@ -90,6 +100,7 @@ Future<String?> goTechReleaseTeam(GoTechAccount account) async {
     if (status != _kHttpOk || body['ok'] != true) return _errorOf(body, status);
     await _set(kOptionGoTechTeamOwner, '');
     await _set(kOptionGoTechTeamLabel, '');
+    await _set(kOptionGoTechEmail, '');
     GoTechRegistration.load();
     return null;
   } catch (e) {
@@ -147,6 +158,8 @@ Future<String?> _keepCustomerRegistration(
   await _set(kOptionGoTechPersonName, _str(body, 'personName'));
   await _set(kOptionGoTechLabel, _str(body, 'label'));
   await _set(kOptionGoTechDeviceToken, _str(body, 'deviceToken'));
+  // a setup link names no account; goTechClaim sets the one that signed in
+  await _set(kOptionGoTechEmail, '');
   // The password changes only now that the panel holds the new one (or none). The app cannot read the old
   // one back, so changing it first and undoing on failure lost unattended access to a network error.
   var applied = true;
@@ -164,4 +177,37 @@ Future<String?> _keepCustomerRegistration(
   return applied
       ? null
       : 'Kayıt tamam ama kalıcı şifre ayarlanamadı; gözetimsiz erişim çalışmaz.';
+}
+
+/// "Çıkış yap": this computer stops being anyone's. A customer's registration is dropped on the panel too, and
+/// a team computer leaves the team list, so nothing of the last person stays on it. Returns an error, or null.
+Future<String?> goTechSignOutComputer() async {
+  try {
+    final deviceToken = _get(kOptionGoTechDeviceToken);
+    if (deviceToken.isNotEmpty) {
+      final (status, body) = await _post('/api/desk/signout',
+          {'deskId': await _deskId(), 'deviceToken': deviceToken});
+      // a 401 means the panel had already forgotten it
+      if (status != _kHttpUnauthorized &&
+          (status != _kHttpOk || body['ok'] != true)) {
+        return _errorOf(body, status);
+      }
+    }
+    final sessionToken = _get('access_token');
+    if (GoTechRegistration.isTeamMachine && sessionToken.isNotEmpty) {
+      final (status, body) = await _post(
+          '/api/desk/release', {'deskId': await _deskId()},
+          token: sessionToken);
+      if (status != _kHttpOk || body['ok'] != true) {
+        return _errorOf(body, status);
+      }
+    }
+  } catch (e) {
+    debugPrint('GoTech sign-out of the computer failed: $e');
+    return _kUnreachable;
+  }
+  await _set(kOptionGoTechTeamOwner, '');
+  await _set(kOptionGoTechTeamLabel, '');
+  await _clearRegistration();
+  return null;
 }
