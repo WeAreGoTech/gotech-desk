@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 
 import 'gotech_account_menu.dart';
 import 'gotech_api.dart';
 import 'gotech_home.dart';
 import 'gotech_login.dart';
+import 'gotech_update.dart';
 
 export 'gotech_api.dart'
     show
@@ -97,6 +97,7 @@ class GoTechUpdateBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (!GoTechUpdate.available) return const SizedBox.shrink();
+      final inPlace = goTechCanUpdateInPlace;
       return Container(
         margin: const EdgeInsets.only(top: 10),
         padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
@@ -113,20 +114,21 @@ class GoTechUpdateBar extends StatelessWidget {
             Expanded(
               child: Text(
                 'Yeni sürüm hazır (${GoTechUpdate.version.value}). '
-                'İndirip kurduğunuzda ayarlarınız korunur.',
+                '${inPlace ? 'Güncelleyince uygulama kendini yeniden başlatır' : 'İndirip kurduğunuzda'}; '
+                'ayarlarınız korunur.',
                 maxLines: 2,
                 style: const TextStyle(fontSize: 13),
               ),
             ),
             ElevatedButton(
-              onPressed: () => launchUrl(Uri.parse(GoTechUpdate.url.value)),
+              onPressed: goTechStartUpdate,
               style: ElevatedButton.styleFrom(
                 backgroundColor: kGoTechRed,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('İndir'),
+              child: Text(inPlace ? 'Güncelle' : 'İndir'),
             ),
           ],
         ),

@@ -379,8 +379,10 @@ pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
     let tag = segments.next()?;
     let filename = segments.next()?;
 
-    if owner != "rustdesk"
-        || repo != "rustdesk"
+    // GoTech: the app updates itself from GoTech's own releases, the same ones the panel offers
+    let trusted_repo = (owner == "rustdesk" && repo == "rustdesk")
+        || (owner == "WeAreGoTech" && repo == "gotech-desk");
+    if !trusted_repo
         || releases != "releases"
         || download != "download"
         || tag.is_empty()
@@ -672,6 +674,19 @@ mod tests {
         assert_eq!(
             file.file_name().and_then(|name| name.to_str()),
             Some("rustdesk-1.4.0-x86_64.dmg")
+        );
+    }
+
+    #[test]
+    fn update_download_file_accepts_gotech_release_assets() {
+        let file = get_download_file_from_url(
+            "https://github.com/WeAreGoTech/gotech-desk/releases/download/gotech-1.5.1/GoTechDesk-1.5.1-x86_64.exe",
+        )
+        .expect("valid GoTech release asset URL");
+
+        assert_eq!(
+            file.file_name().and_then(|name| name.to_str()),
+            Some("GoTechDesk-1.5.1-x86_64.exe")
         );
     }
 
