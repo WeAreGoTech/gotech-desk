@@ -171,8 +171,8 @@ class _SignInCard extends StatelessWidget {
       icon: Icons.login_rounded,
       action: 'Giriş yap',
       onAction: showGoTechLoginDialog,
-      link: 'Hesabınız yok mu? Firma koduyla kaydolun',
-      onLink: showGoTechRegisterDialog,
+      link: 'Hesabınız yok mu? GoTech\'ten isteyin',
+      onLink: goTechRequestAccount,
     );
   }
 }

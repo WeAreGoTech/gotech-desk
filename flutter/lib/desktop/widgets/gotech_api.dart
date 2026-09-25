@@ -29,7 +29,6 @@ const kOptionGoTechTeamLabel = 'gotech-team-label';
 // the e-mail of the account that signed this computer in, shown in the account menu
 const kOptionGoTechEmail = 'gotech-email';
 const _kOptionPresetToken = 'gotech-preset-token';
-const _kOptionPresetCode = 'gotech-preset-code';
 const _kOptionInstallOffered = 'gotech-install-offered';
 const kOptionGoTechSupportIds = 'gotech-support-ids';
 const kOptionGoTechSupportNames = 'gotech-support-names';
@@ -48,18 +47,6 @@ const _kHttpOk = 200;
 const _kHttpUnauthorized = 401;
 const _kUnreachable =
     'GoTech sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.';
-
-class GoTechPerson {
-  final String id;
-  final String displayName;
-  const GoTechPerson(this.id, this.displayName);
-}
-
-class GoTechLookup {
-  final String companyName;
-  final List<GoTechPerson> people;
-  const GoTechLookup(this.companyName, this.people);
-}
 
 /// Either a value or a user-facing error message.
 class GoTechResult<T> {
@@ -144,10 +131,13 @@ class GoTechRegistration {
   static bool get isTeamMachine => !isRegistered && teamOwner.value.isNotEmpty;
 
   static bool get isRegistered =>
-      customerCode.value.isNotEmpty && _get(kOptionGoTechDeviceToken).isNotEmpty;
+      customerCode.value.isNotEmpty &&
+      _get(kOptionGoTechDeviceToken).isNotEmpty;
 
   static bool get shouldPrompt =>
-      !isRegistered && !isTeamMachine && _get(kOptionGoTechRegisterSkipped) != 'Y';
+      !isRegistered &&
+      !isTeamMachine &&
+      _get(kOptionGoTechRegisterSkipped) != 'Y';
 
   static String get who =>
       [personName.value, label.value].where((s) => s.isNotEmpty).join(' · ');
@@ -198,80 +188,6 @@ String _errorOf(Map<String, dynamic> body, int status) =>
 
 String _str(Map<String, dynamic> body, String key) =>
     body[key] is String ? body[key] : '';
-
-Future<GoTechResult<GoTechLookup>> goTechLookup(String customerCode) async {
-  try {
-    final (status, body) =
-        await _post('/api/desk/lookup', {'customerCode': customerCode});
-    if (status != _kHttpOk || body['ok'] != true) {
-      return GoTechResult.fail(_errorOf(body, status));
-    }
-    final people = (body['people'] is List ? body['people'] as List : [])
-        .whereType<Map>()
-        .map((p) => GoTechPerson('${p['id']}', '${p['displayName']}'))
-        .toList();
-    return GoTechResult.ok(GoTechLookup(_str(body, 'companyName'), people));
-  } catch (e) {
-    debugPrint('GoTech lookup failed: $e');
-    return const GoTechResult.fail(_kUnreachable);
-  }
-}
-
-/// Registers this device. Exactly one of [personId], [personName], [label]
-/// describes who uses it. Returns an error message, or null on success.
-Future<String?> goTechRegister({
-  required String customerCode,
-  required bool unattended,
-  String? personId,
-  String? personName,
-  String? label,
-}) async {
-  final wasUnattended = _get(kOptionGoTechUnattended) == 'Y';
-  final password = unattended ? _generatePassword() : null;
-  if (password != null || wasUnattended) {
-    final ok = await bind.mainSetPermanentPasswordWithResult(
-        password: password ?? '');
-    if (!ok) return 'Kalıcı şifre ayarlanamadı.';
-  }
-
-  Future<void> revertPassword() async {
-    if (password != null && !wasUnattended) {
-      await bind.mainSetPermanentPasswordWithResult(password: '');
-    }
-  }
-
-  try {
-    final (status, body) = await _post('/api/desk/register', {
-      'customerCode': customerCode,
-      'deskId': await _deskId(),
-      'hostname': Platform.localHostname,
-      'platform': Platform.operatingSystem,
-      'appVersion': await bind.mainGetVersion(),
-      'unattendedPassword': password,
-      'personId': personId,
-      'personName': personName,
-      'label': label,
-    });
-    if (status != _kHttpOk || body['ok'] != true) {
-      await revertPassword();
-      return _errorOf(body, status);
-    }
-    await _set(kOptionGoTechCustomerCode, customerCode);
-    await _set(kOptionGoTechCompanyName, _str(body, 'companyName'));
-    await _set(kOptionGoTechPersonName, _str(body, 'personName'));
-    await _set(kOptionGoTechLabel, _str(body, 'label'));
-    await _set(kOptionGoTechDeviceToken, _str(body, 'deviceToken'));
-    await _set(kOptionGoTechUnattended, unattended ? 'Y' : '');
-    // registered by company code, not by an account
-    await _set(kOptionGoTechEmail, '');
-    GoTechRegistration.load();
-    return null;
-  } catch (e) {
-    debugPrint('GoTech register failed: $e');
-    await revertPassword();
-    return _kUnreachable;
-  }
-}
 
 Future<void> _clearRegistration() async {
   // the unattended password was GoTech's; a computer signed out (here or from the panel) must not keep it
@@ -326,39 +242,11 @@ Future<bool> goTechInstallDownload() async {
       _downloadedFileName().toLowerCase().contains('portable')) {
     return false;
   }
-  // the installed copy is named GoTechDesk.exe and cannot read what this file's name carried
+  // the installed copy is named GoTechDesk.exe and cannot read the setup link this file's name carried
   await _set(_kOptionPresetToken, goTechPresetSetupToken());
-  await _set(_kOptionPresetCode, goTechPresetCompanyCode());
   await _set(_kOptionInstallOffered, 'Y');
   bind.mainGotoInstall();
   return true;
-}
-
-/// The company code an installer carried in its file name (GoTechDesk-799990.exe)
-/// or that an IT department dropped next to the app, so the customer types nothing.
-String goTechPresetCompanyCode() {
-  // a setup link's token can hold six digits in a row, which are no company code
-  final fromName = goTechPresetSetupToken().isEmpty
-      ? RegExp(r'(\d{6})').firstMatch(_downloadedFileName())
-      : null;
-  if (fromName != null) return fromName.group(1)!;
-  final kept = _get(_kOptionPresetCode);
-  if (kept.isNotEmpty) return kept;
-  for (final path in [
-    r'C:\ProgramData\GoTechDesk\firma.txt',
-    '/Library/Application Support/GoTechDesk/firma.txt',
-  ]) {
-    try {
-      final file = File(path);
-      if (file.existsSync()) {
-        final code = RegExp(r'\d{6}').firstMatch(file.readAsStringSync());
-        if (code != null) return code.group(0)!;
-      }
-    } catch (_) {
-      // unreadable is the same as absent
-    }
-  }
-  return '';
 }
 
 /// A GoTech computer has no device token to authenticate with, so it asks whether the panel
@@ -477,7 +365,9 @@ Future<void> _applyUpdate(dynamic update) async {
     return;
   }
   final version = '${update['version'] ?? ''}';
-  final url = Platform.isMacOS ? '${update['macUrl'] ?? ''}' : '${update['windowsUrl'] ?? ''}';
+  final url = Platform.isMacOS
+      ? '${update['macUrl'] ?? ''}'
+      : '${update['windowsUrl'] ?? ''}';
   await _set(kOptionGoTechLatestVersion, version);
   await _set(kOptionGoTechDownloadUrl, url);
 }

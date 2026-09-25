@@ -125,7 +125,7 @@ void showGoTechLoginDialog({String email = ''}) {
     }
 
     // "Hayır": the computer is not GoTech's. It leaves the team list, no team session stays on it, and the
-    // sign-in starts over for the customer's account or the company code.
+    // sign-in starts over for the customer's account.
     Future<String?> notTeam(GoTechAccount account) async {
       final err = await goTechReleaseTeam(account);
       if (err != null) return err;
@@ -139,8 +139,7 @@ void showGoTechLoginDialog({String email = ''}) {
         return null;
       }
       passwordController.clear();
-      notice = 'Ekip bilgisayarı değil. Müşterinin hesabıyla giriş yapın '
-          'ya da firma koduyla kaydedin.';
+      notice = 'Ekip bilgisayarı değil. Müşterinin hesabıyla giriş yapın.';
       return null;
     }
 
@@ -163,14 +162,6 @@ void showGoTechLoginDialog({String email = ''}) {
       finish();
       showToast('${GoTechRegistration.companyName.value} olarak kaydedildi');
       return null;
-    }
-
-    void useCompanyCode() {
-      if (loading) return;
-      final account = staff;
-      if (account != null) goTechSignOut(account.token);
-      finish();
-      showGoTechRegisterDialog();
     }
 
     void later() {
@@ -210,7 +201,6 @@ void showGoTechLoginDialog({String email = ''}) {
                 onUnattended: (v) => setState(() => unattended = v),
                 loading: loading,
                 onSubmit: () => run(signIn),
-                onCompanyCode: useCompanyCode,
               ),
             if (errMsg.isNotEmpty)
               Text(errMsg, style: const TextStyle(color: kGoTechRed))
@@ -244,7 +234,6 @@ List<Widget> _signInStep({
   required ValueChanged<bool> onUnattended,
   required bool loading,
   required VoidCallback onSubmit,
-  required VoidCallback onCompanyCode,
 }) {
   return [
     if (notice.isNotEmpty)
@@ -291,10 +280,10 @@ List<Widget> _signInStep({
           child: const Text('Şifremi unuttum'),
         ),
         TextButton(
-          onPressed: loading ? null : onCompanyCode,
+          onPressed: goTechRequestAccount,
           style: TextButton.styleFrom(
               foregroundColor: kGoTechRed, padding: EdgeInsets.zero),
-          child: const Text('Hesabınız yok mu? Firma koduyla kaydolun'),
+          child: const Text('Hesabınız yok mu? GoTech\'ten isteyin'),
         ),
       ],
     ),
@@ -398,3 +387,7 @@ void showGoTechSignOutDialog() {
     );
   });
 }
+
+/// Someone without a panel account asks GoTech for one; the app has no other way to register a computer.
+void goTechRequestAccount() =>
+    launchUrl(Uri.parse('${goTechApiBase()}/iletisim'));
