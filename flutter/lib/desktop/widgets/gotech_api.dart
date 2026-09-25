@@ -232,19 +232,26 @@ String goTechPresetSetupToken() =>
 Future<void> goTechForgetPresetToken() => _set(_kOptionPresetToken, '');
 
 /// The downloaded exe installs itself at its first start; only one named "...-portable.exe" (a separate
-/// download on the panel) keeps running without installing. Offered once: someone without admin rights
-/// who cancels or picks "Run without install" gets the app as before. True when the installer took over.
+/// download on the panel) keeps running without installing. On a computer with an older version installed it
+/// installs over it: running next to that version's service instead is what broke input and the ID.
+/// Offered once per downloaded version: someone without admin rights who cancels or picks "Run without
+/// install" gets the app as before. True when the installer took over.
 Future<bool> goTechInstallDownload() async {
+  // only the downloaded exe runs through the portable packer; the installed app never does
+  final downloaded =
+      (Platform.environment['RUSTDESK_APPNAME'] ?? '').isNotEmpty;
+  final offerKey = '${_downloadedFileName()} ${await bind.mainGetVersion()}';
   if (!Platform.isWindows ||
+      !downloaded ||
       bind.isDisableInstallation() ||
-      bind.mainIsInstalled() ||
-      _get(_kOptionInstallOffered) == 'Y' ||
+      (bind.mainIsInstalled() && !bind.mainIsInstalledLowerVersion()) ||
+      _get(_kOptionInstallOffered) == offerKey ||
       _downloadedFileName().toLowerCase().contains('portable')) {
     return false;
   }
   // the installed copy is named GoTechDesk.exe and cannot read the setup link this file's name carried
   await _set(_kOptionPresetToken, goTechPresetSetupToken());
-  await _set(_kOptionInstallOffered, 'Y');
+  await _set(_kOptionInstallOffered, offerKey);
   bind.mainGotoInstall();
   return true;
 }
