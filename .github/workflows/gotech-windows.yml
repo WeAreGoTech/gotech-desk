@@ -209,9 +209,12 @@ jobs:
         shell: bash
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
+          # The installer copies the packed folder as is and registers <APP_NAME>.exe (install_me in
+          # src/platform/windows.rs); packed as rustdesk.exe, the install had no GoTechDesk.exe at all.
+          mv ./rustdesk/rustdesk.exe ./rustdesk/${{ env.APP_NAME }}.exe
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/${{ env.APP_NAME }}.exe
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.APP_NAME }}-${{ env.VERSION }}-x86_64${{ matrix.variant.suffix }}.exe
@@ -223,7 +226,6 @@ jobs:
 
       - name: Build msi
         run: |
-          mv ./rustdesk/rustdesk.exe ./rustdesk/${{ env.APP_NAME }}.exe
           pushd ./res/msi
           python preprocess.py -d ../../rustdesk --app-name ${{ env.APP_NAME }} -m GoTech
           nuget restore msi.sln
