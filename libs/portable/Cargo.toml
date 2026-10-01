@@ -28,7 +28,7 @@ native-windows-gui = {version = "1.0", default-features = false, features = ["an
 [package.metadata.winres]
 LegalCopyright = "GoTech Desk, based on RustDesk (AGPL-3.0). Copyright © 2026 Purslane Tech Pte. Ltd."
 ProductName = "GoTech Desk"
-OriginalFilename = "rustdesk.exe"
+OriginalFilename = "GoTechDesk.exe"
 FileDescription = "GoTech Desk"
 #ProductVersion = ""
 
