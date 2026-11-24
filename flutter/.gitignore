@@ -54,3 +54,6 @@ flutter_export_environment.sh
 Flutter-Generated.xcconfig
 key.jks
 macos/rustdesk.xcodeproj/project.xcworkspace/
+
+# GoTech layout renders written by test/gotech_golden_test.dart
+/test/goldens/
