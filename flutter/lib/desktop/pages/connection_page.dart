@@ -20,7 +20,6 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
-import '../../desktop/widgets/gotech_home.dart';
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})

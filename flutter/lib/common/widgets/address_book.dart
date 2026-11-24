@@ -19,6 +19,7 @@ import 'package:get/get.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../common.dart';
+import '../../desktop/widgets/gotech_rehber.dart';
 import 'dialog.dart';
 import 'login.dart';
 
@@ -26,7 +27,11 @@ final hideAbTagsPanel = false.obs;
 
 class AddressBook extends StatefulWidget {
   final EdgeInsets? menuPadding;
-  const AddressBook({Key? key, this.menuPadding}) : super(key: key);
+
+  /// GoTech: the companies live in the sidebar, the peers in one table box.
+  final bool goTech;
+  const AddressBook({Key? key, this.menuPadding, this.goTech = false})
+      : super(key: key);
 
   @override
   State<StatefulWidget> createState() {
@@ -73,6 +78,12 @@ class _AddressBookState extends State<AddressBook> {
       });
 
   Widget _buildAddressBookLandscape() {
+    if (widget.goTech) {
+      return GoTechAbBox(
+        onMore: (p) => _showGoTechMenu(RelativeRect.fromLTRB(p.dx, p.dy, p.dx, p.dy)),
+        rows: AddressBookPeersView(menuPadding: widget.menuPadding, goTech: true),
+      );
+    }
     return Row(
       children: [
         Offstage(
@@ -425,6 +436,26 @@ class _AddressBookState extends State<AddressBook> {
     );
   }
 
+  /// The tag menu without the multi-tag entries: GoTech selects one company at a time.
+  void _showGoTechMenu(RelativeRect pos) {
+    final canWrite = gFFI.abModel.current.canWrite();
+    _showMenuItems(pos, [
+      if (canWrite) getEntry(translate("Add ID"), addIdToCurrentAb),
+      if (canWrite) syncMenuItem(),
+      getEntry(translate("Refresh"),
+          () => gFFI.abModel.pullAb(force: ForcePullAb.current, quiet: false)),
+      if (!gFFI.abModel.legacyMode.value && canWrite)
+        getEntry(translate("ab_web_console_tip"), _openWebConsole),
+    ]);
+  }
+
+  Future<void> _openWebConsole() async {
+    final url = await bind.mainGetApiServer();
+    if (await canLaunchUrlString(url)) {
+      launchUrlString(url);
+    }
+  }
+
   void _showMenu(RelativeRect pos) {
     final canWrite = gFFI.abModel.current.canWrite();
     final items = [
@@ -438,14 +469,12 @@ class _AddressBookState extends State<AddressBook> {
       if (!gFFI.abModel.legacyMode.value && canWrite)
         MenuEntryDivider<String>(),
       if (!gFFI.abModel.legacyMode.value && canWrite)
-        getEntry(translate("ab_web_console_tip"), () async {
-          final url = await bind.mainGetApiServer();
-          if (await canLaunchUrlString(url)) {
-            launchUrlString(url);
-          }
-        }),
+        getEntry(translate("ab_web_console_tip"), _openWebConsole),
     ];
+    _showMenuItems(pos, items);
+  }
 
+  void _showMenuItems(RelativeRect pos, List<MenuEntryBase<String>> items) {
     mod_menu.showMenu(
       context: context,
       position: pos,

@@ -16,6 +16,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../common.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
+import '../../desktop/widgets/gotech_peer_row.dart';
 import 'peer_card.dart';
 
 typedef PeerFilter = bool Function(Peer peer);
@@ -54,6 +55,9 @@ class PeersModelName {
 /// for peer search text, global obs value
 final peerSearchText = "".obs;
 
+/// GoTech: "Sadece çevrimiçi" in the list toolbar, global obs value
+final peerOnlineOnly = false.obs;
+
 /// for peer sort, global obs value
 RxString? _peerSort;
 RxString get peerSort {
@@ -73,11 +77,15 @@ class _PeersView extends StatefulWidget {
   final PeerCardBuilder peerCardBuilder;
   final PeerTabIndex peerTabIndex;
 
+  /// GoTech: one full-width row per peer, GoTech search and the online filter.
+  final bool goTech;
+
   const _PeersView(
       {required this.peers,
       required this.peerCardBuilder,
       required this.peerTabIndex,
       this.peerFilter,
+      this.goTech = false,
       Key? key})
       : super(key: key);
 
@@ -187,6 +195,7 @@ class _PeersViewState extends State<_PeersView>
       child: Consumer<Peers>(builder: (context, peers, child) {
         if (peers.peers.isEmpty) {
           gFFI.peerTabModel.setCurrentTabCachedPeers([]);
+          if (widget.goTech) return goTechEmptyTab(widget.peerTabIndex);
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -263,7 +272,20 @@ class _PeersViewState extends State<_PeersView>
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
             // Continious rebuilds of `ListView.builder` will cause memory leak.
             // Simple demo can reproduce this issue.
-            final Widget child = Obx(() => stateGlobal.isPortrait.isTrue
+            final Widget child = widget.goTech
+                ? (peers.isEmpty
+                    ? goTechNoMatch(widget.peerTabIndex)
+                    : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: peers.length,
+                        itemBuilder: (BuildContext context, int index) =>
+                            VisibilityDetector(
+                              key: ValueKey(_cardId(peers[index].id)),
+                              onVisibilityChanged: onVisibilityChanged,
+                              child: widget.peerCardBuilder(peers[index]),
+                            ),
+                      ))
+                : Obx(() => stateGlobal.isPortrait.isTrue
                 ? ListView.builder(
                     itemCount: peers.length,
                     itemBuilder: (BuildContext context, int index) {
@@ -303,7 +325,8 @@ class _PeersViewState extends State<_PeersView>
             );
           }
         },
-        future: matchPeers(filters[0].value, filters[1].value, peers.peers),
+        future: matchPeers(filters[0].value, filters[1].value, peers.peers,
+            onlineOnly: widget.goTech && peerOnlineOnly.value),
       );
     }, obslist);
 
@@ -359,9 +382,13 @@ class _PeersViewState extends State<_PeersView>
   }
 
   Future<List<Peer>>? matchPeers(
-      String searchText, String sortedBy, List<Peer> peers) async {
+      String searchText, String sortedBy, List<Peer> peers,
+      {bool onlineOnly = false}) async {
     if (widget.peerFilter != null) {
       peers = peers.where((peer) => widget.peerFilter!(peer)).toList();
+    }
+    if (onlineOnly) {
+      peers = peers.where((peer) => peer.online).toList();
     }
 
     // fallback to id sorting
@@ -396,6 +423,9 @@ class _PeersViewState extends State<_PeersView>
     if (searchText.isEmpty) {
       return peers;
     }
+    if (widget.goTech) {
+      return peers.where((peer) => goTechPeerMatches(searchText, peer)).toList();
+    }
     searchText = searchText.toLowerCase();
     final matches = await Future.wait(
         peers.map((peer) => matchPeer(searchText, peer, widget.peerTabIndex)));
@@ -414,12 +444,14 @@ abstract class BasePeersView extends StatelessWidget {
   final PeerTabIndex peerTabIndex;
   final PeerFilter? peerFilter;
   final PeerCardBuilder peerCardBuilder;
+  final bool goTech;
 
   const BasePeersView({
     Key? key,
     required this.peerTabIndex,
     this.peerFilter,
     required this.peerCardBuilder,
+    this.goTech = false,
   }) : super(key: key);
 
   @override
@@ -446,19 +478,25 @@ abstract class BasePeersView extends StatelessWidget {
         peers: peers,
         peerFilter: peerFilter,
         peerCardBuilder: peerCardBuilder,
-        peerTabIndex: peerTabIndex);
+        peerTabIndex: peerTabIndex,
+        goTech: goTech);
   }
 }
 
 class RecentPeersView extends BasePeersView {
   RecentPeersView(
-      {Key? key, EdgeInsets? menuPadding, ScrollController? scrollController})
+      {Key? key,
+      EdgeInsets? menuPadding,
+      ScrollController? scrollController,
+      bool goTech = false})
       : super(
           key: key,
           peerTabIndex: PeerTabIndex.recent,
+          goTech: goTech,
           peerCardBuilder: (Peer peer) => RecentPeerCard(
             peer: peer,
             menuPadding: menuPadding,
+            goTechRow: goTech,
           ),
         );
 
@@ -472,13 +510,18 @@ class RecentPeersView extends BasePeersView {
 
 class FavoritePeersView extends BasePeersView {
   FavoritePeersView(
-      {Key? key, EdgeInsets? menuPadding, ScrollController? scrollController})
+      {Key? key,
+      EdgeInsets? menuPadding,
+      ScrollController? scrollController,
+      bool goTech = false})
       : super(
           key: key,
           peerTabIndex: PeerTabIndex.fav,
+          goTech: goTech,
           peerCardBuilder: (Peer peer) => FavoritePeerCard(
             peer: peer,
             menuPadding: menuPadding,
+            goTechRow: goTech,
           ),
         );
 
@@ -492,13 +535,18 @@ class FavoritePeersView extends BasePeersView {
 
 class DiscoveredPeersView extends BasePeersView {
   DiscoveredPeersView(
-      {Key? key, EdgeInsets? menuPadding, ScrollController? scrollController})
+      {Key? key,
+      EdgeInsets? menuPadding,
+      ScrollController? scrollController,
+      bool goTech = false})
       : super(
           key: key,
           peerTabIndex: PeerTabIndex.lan,
+          goTech: goTech,
           peerCardBuilder: (Peer peer) => DiscoveredPeerCard(
             peer: peer,
             menuPadding: menuPadding,
+            goTechRow: goTech,
           ),
         );
 
@@ -513,15 +561,20 @@ class DiscoveredPeersView extends BasePeersView {
 
 class AddressBookPeersView extends BasePeersView {
   AddressBookPeersView(
-      {Key? key, EdgeInsets? menuPadding, ScrollController? scrollController})
+      {Key? key,
+      EdgeInsets? menuPadding,
+      ScrollController? scrollController,
+      bool goTech = false})
       : super(
           key: key,
           peerTabIndex: PeerTabIndex.ab,
+          goTech: goTech,
           peerFilter: (Peer peer) =>
               _hitTag(gFFI.abModel.selectedTags, peer.tags),
           peerCardBuilder: (Peer peer) => AddressBookPeerCard(
             peer: peer,
             menuPadding: menuPadding,
+            goTechRow: goTech,
           ),
         );
 

@@ -24,9 +24,13 @@ import 'package:pull_down_button/pull_down_button.dart';
 
 import '../../common.dart';
 import '../../models/platform_model.dart';
+import '../../desktop/widgets/gotech_peer_toolbar.dart';
+import '../../desktop/widgets/gotech_table_view.dart';
 
 class PeerTabPage extends StatefulWidget {
-  const PeerTabPage({Key? key}) : super(key: key);
+  /// GoTech: no tab strip (the tabs are in the sidebar), a search toolbar and table rows.
+  final bool goTechLayout;
+  const PeerTabPage({Key? key, this.goTechLayout = false}) : super(key: key);
   @override
   State<PeerTabPage> createState() => _PeerTabPageState();
 }
@@ -43,19 +47,23 @@ EdgeInsets? _menuPadding() {
 
 class _PeerTabPageState extends State<PeerTabPage>
     with SingleTickerProviderStateMixin {
-  final List<_TabEntry> entries = [
+  late final List<_TabEntry> entries = [
     _TabEntry(RecentPeersView(
       menuPadding: _menuPadding(),
+      goTech: widget.goTechLayout,
     )),
     _TabEntry(FavoritePeersView(
       menuPadding: _menuPadding(),
+      goTech: widget.goTechLayout,
     )),
     _TabEntry(DiscoveredPeersView(
       menuPadding: _menuPadding(),
+      goTech: widget.goTechLayout,
     )),
     _TabEntry(
         AddressBook(
           menuPadding: _menuPadding(),
+          goTech: widget.goTechLayout,
         ),
         ({dynamic hint}) => gFFI.abModel.pullAb(
             force: hint == null ? ForcePullAb.listAndCurrent : null,
@@ -98,9 +106,44 @@ class _PeerTabPageState extends State<PeerTabPage>
     }
   }
 
+  void _goTechRefresh() {
+    final tab = gFFI.peerTabModel.currentTab;
+    final load = tab < entries.length ? entries[tab].load : null;
+    if (load != null) {
+      load();
+    } else if (tab == PeerTabIndex.recent.index) {
+      bind.mainLoadRecentPeers();
+    } else if (tab == PeerTabIndex.fav.index) {
+      bind.mainLoadFavPeers();
+    } else if (tab == PeerTabIndex.lan.index) {
+      bind.mainLoadLanPeers();
+      bind.mainDiscover();
+    }
+  }
+
+  Widget _buildGoTech(PeerTabModel model) {
+    final tab = model.currentTab;
+    final peers = _currentPeersWidget(model);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GoTechPeerToolbar(tab: tab, onRefresh: _goTechRefresh),
+        const SizedBox(height: kGoTechToolbarGap),
+        Expanded(
+          // the address book draws its own box with the company on top
+          child: (tab == PeerTabIndex.ab.index
+                  ? peers
+                  : GoTechTableBox(rows: peers))
+              .marginOnly(bottom: kGoTechBoxBottom),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final model = Provider.of<PeerTabModel>(context);
+    if (widget.goTechLayout) return _buildGoTech(model);
     Widget selectionWrap(Widget widget) {
       return model.multiSelectionMode ? createMultiSelectionBar(model) : widget;
     }
@@ -187,6 +230,12 @@ class _PeerTabPageState extends State<PeerTabPage>
 
   Widget _createPeersView() {
     final model = Provider.of<PeerTabModel>(context);
+    return Expanded(
+        child: _currentPeersWidget(model).marginSymmetric(
+            vertical: (isDesktop || isWebDesktop) ? 12.0 : 6.0));
+  }
+
+  Widget _currentPeersWidget(PeerTabModel model) {
     Widget child;
     if (model.visibleEnabledOrderedIndexs.isEmpty) {
       child = visibleContextMenuListener(Row(
@@ -203,9 +252,7 @@ class _PeerTabPageState extends State<PeerTabPage>
         child = entries[0].widget;
       }
     }
-    return Expanded(
-        child: child.marginSymmetric(
-            vertical: (isDesktop || isWebDesktop) ? 12.0 : 6.0));
+    return child;
   }
 
   Widget _createRefresh(

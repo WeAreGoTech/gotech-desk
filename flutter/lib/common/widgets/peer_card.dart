@@ -14,6 +14,7 @@ import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../desktop/widgets/popup_menu.dart';
+import '../../desktop/widgets/gotech_peer_row.dart';
 import 'dart:math' as math;
 
 typedef PopupMenuEntryBuilder = Future<List<mod_menu.PopupMenuEntry<String>>>
@@ -497,12 +498,33 @@ abstract class BasePeerCard extends StatelessWidget {
   final PeerTabIndex tab;
   final EdgeInsets? menuPadding;
 
+  /// GoTech: a table row instead of a card, with the same menu and connect.
+  final bool goTechRow;
+
   BasePeerCard(
-      {required this.peer, required this.tab, this.menuPadding, Key? key})
+      {required this.peer,
+      required this.tab,
+      this.menuPadding,
+      this.goTechRow = false,
+      Key? key})
       : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    if (goTechRow) {
+      return GoTechPeerRow(
+        peer: peer,
+        tab: tab,
+        onConnect: () => connectInPeerTab(context, peer, tab),
+        onMenu: (BuildContext context, RelativeRect position) async =>
+            mod_menu.showMenu(
+              context: context,
+              position: position,
+              items: await _buildPopupMenuEntry(context),
+              elevation: 8,
+            ),
+      );
+    }
     return _PeerCard(
       peer: peer,
       tab: tab,
@@ -945,11 +967,16 @@ abstract class BasePeerCard extends StatelessWidget {
 }
 
 class RecentPeerCard extends BasePeerCard {
-  RecentPeerCard({required Peer peer, EdgeInsets? menuPadding, Key? key})
+  RecentPeerCard(
+      {required Peer peer,
+      EdgeInsets? menuPadding,
+      bool goTechRow = false,
+      Key? key})
       : super(
             peer: peer,
             tab: PeerTabIndex.recent,
             menuPadding: menuPadding,
+            goTechRow: goTechRow,
             key: key);
 
   @override
@@ -1010,11 +1037,16 @@ class RecentPeerCard extends BasePeerCard {
 }
 
 class FavoritePeerCard extends BasePeerCard {
-  FavoritePeerCard({required Peer peer, EdgeInsets? menuPadding, Key? key})
+  FavoritePeerCard(
+      {required Peer peer,
+      EdgeInsets? menuPadding,
+      bool goTechRow = false,
+      Key? key})
       : super(
             peer: peer,
             tab: PeerTabIndex.fav,
             menuPadding: menuPadding,
+            goTechRow: goTechRow,
             key: key);
 
   @override
@@ -1070,11 +1102,16 @@ class FavoritePeerCard extends BasePeerCard {
 }
 
 class DiscoveredPeerCard extends BasePeerCard {
-  DiscoveredPeerCard({required Peer peer, EdgeInsets? menuPadding, Key? key})
+  DiscoveredPeerCard(
+      {required Peer peer,
+      EdgeInsets? menuPadding,
+      bool goTechRow = false,
+      Key? key})
       : super(
             peer: peer,
             tab: PeerTabIndex.lan,
             menuPadding: menuPadding,
+            goTechRow: goTechRow,
             key: key);
 
   @override
@@ -1129,11 +1166,16 @@ class DiscoveredPeerCard extends BasePeerCard {
 }
 
 class AddressBookPeerCard extends BasePeerCard {
-  AddressBookPeerCard({required Peer peer, EdgeInsets? menuPadding, Key? key})
+  AddressBookPeerCard(
+      {required Peer peer,
+      EdgeInsets? menuPadding,
+      bool goTechRow = false,
+      Key? key})
       : super(
             peer: peer,
             tab: PeerTabIndex.ab,
             menuPadding: menuPadding,
+            goTechRow: goTechRow,
             key: key);
 
   @override

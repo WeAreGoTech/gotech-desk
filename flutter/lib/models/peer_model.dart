@@ -22,6 +22,8 @@ class Peer {
   String device_group_name;
   String note;
   bool? sameServer;
+  // GoTech: the panel's last heartbeat of this computer (address book key `last_seen`, ISO 8601)
+  DateTime? lastSeen;
 
   String getId() {
     if (alias != '') {
@@ -45,7 +47,10 @@ class Peer {
         loginName = json['loginName'] ?? '',
         device_group_name = json['device_group_name'] ?? '',
         note = json['note'] is String ? json['note'] : '',
-        sameServer = json['same_server'];
+        sameServer = json['same_server'],
+        lastSeen = json['last_seen'] is String
+            ? DateTime.tryParse(json['last_seen'])
+            : null;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -64,6 +69,7 @@ class Peer {
       'device_group_name': device_group_name,
       'note': note,
       'same_server': sameServer,
+      if (lastSeen != null) 'last_seen': lastSeen!.toIso8601String(),
     };
   }
 
@@ -109,6 +115,7 @@ class Peer {
     required this.device_group_name,
     required this.note,
     this.sameServer,
+    this.lastSeen,
   });
 
   Peer.loading()
@@ -161,7 +168,8 @@ class Peer {
         loginName: other.loginName,
         device_group_name: other.device_group_name,
         note: other.note,
-        sameServer: other.sameServer);
+        sameServer: other.sameServer,
+        lastSeen: other.lastSeen);
     peer.online = other.online;
     return peer;
   }

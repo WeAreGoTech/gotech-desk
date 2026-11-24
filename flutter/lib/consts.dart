@@ -4,6 +4,9 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
+// GoTech sizes and colors live in a file with no app imports, so widget tests can load them.
+export 'package:flutter_hbb/desktop/widgets/gotech_tokens.dart';
+
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;
 

@@ -8,9 +8,10 @@ import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:provider/provider.dart';
 
-const kGoTechRed = Color(0xFFE2463B);
-const kGoTechContentWidth = 680.0;
-const kGoTechRadius = 14.0;
+import 'gotech_sidebar_footer_view.dart';
+import 'gotech_tokens.dart';
+
+export 'gotech_tokens.dart';
 
 BoxDecoration goTechCardDecoration(BuildContext context) => BoxDecoration(
       color: Theme.of(context).cardColor,
@@ -19,15 +20,57 @@ BoxDecoration goTechCardDecoration(BuildContext context) => BoxDecoration(
           color: Theme.of(context).dividerColor.withOpacity(0.12)),
     );
 
-/// This device's ID and password in one horizontal card.
+/// This device's ID and password in one horizontal card, or in two short lines at the foot of the
+/// sidebar when [compact].
 class GoTechDeviceCard extends StatelessWidget {
-  const GoTechDeviceCard({Key? key}) : super(key: key);
+  final bool compact;
+  const GoTechDeviceCard({Key? key, this.compact = false}) : super(key: key);
+
+  List<Widget> _passwordActions(ServerModel model) {
+    final showOneTime = model.approveMode != 'click' &&
+        model.verificationMethod != kUsePermanentPassword;
+    return [
+      if (showOneTime)
+        GoTechIconButton(
+          icon: Icons.copy_rounded,
+          tooltip: translate('Copy'),
+          compact: compact,
+          onTap: () => _copy(model.serverPasswd.text),
+        ),
+      if (showOneTime)
+        GoTechIconButton(
+          icon: Icons.refresh_rounded,
+          tooltip: translate('Refresh Password'),
+          compact: compact,
+          onTap: () => bind.mainUpdateTemporaryPassword(),
+        ),
+      if (!bind.isDisableSettings())
+        GoTechIconButton(
+          icon: Icons.edit_outlined,
+          tooltip: translate('Change Password'),
+          compact: compact,
+          onTap: () => DesktopSettingPage.switch2page(SettingsTabKey.safety),
+        ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ServerModel>(builder: (context, model, _) {
-      final showOneTime = model.approveMode != 'click' &&
-          model.verificationMethod != kUsePermanentPassword;
+      final copyId = GoTechIconButton(
+        icon: Icons.copy_rounded,
+        tooltip: translate('Copy'),
+        compact: compact,
+        onTap: () => _copy(model.serverId.text),
+      );
+      if (compact) {
+        return GoTechCompactIdRows(
+          id: model.serverId,
+          password: model.serverPasswd,
+          idActions: [copyId],
+          passwordActions: _passwordActions(model),
+        );
+      }
       return Container(
         padding: const EdgeInsets.fromLTRB(20, 14, 10, 14),
         decoration: goTechCardDecoration(context),
@@ -40,13 +83,7 @@ class GoTechDeviceCard extends StatelessWidget {
                   label: translate('ID'),
                   controller: model.serverId,
                   fontSize: 26,
-                  actions: [
-                    _GoTechIconButton(
-                      icon: Icons.copy_rounded,
-                      tooltip: 'Copy',
-                      onTap: () => _copy(model.serverId.text),
-                    ),
-                  ],
+                  actions: [copyId],
                 ),
               ),
               VerticalDivider(
@@ -59,36 +96,16 @@ class GoTechDeviceCard extends StatelessWidget {
                   label: translate('One-time Password'),
                   controller: model.serverPasswd,
                   fontSize: 20,
-                  actions: [
-                    if (showOneTime)
-                      _GoTechIconButton(
-                        icon: Icons.copy_rounded,
-                        tooltip: 'Copy',
-                        onTap: () => _copy(model.serverPasswd.text),
-                      ),
-                    if (showOneTime)
-                      _GoTechIconButton(
-                        icon: Icons.refresh_rounded,
-                        tooltip: 'Refresh Password',
-                        onTap: () => bind.mainUpdateTemporaryPassword(),
-                      ),
-                    if (!bind.isDisableSettings())
-                      _GoTechIconButton(
-                        icon: Icons.edit_outlined,
-                        tooltip: 'Change Password',
-                        onTap: () => DesktopSettingPage.switch2page(
-                            SettingsTabKey.safety),
-                      ),
-                  ],
+                  actions: _passwordActions(model),
                 ),
               ),
               VerticalDivider(
                 width: 20,
                 color: Theme.of(context).dividerColor.withOpacity(0.2),
               ),
-              _GoTechIconButton(
+              GoTechIconButton(
                 icon: Icons.settings_outlined,
-                tooltip: 'Settings',
+                tooltip: translate('Settings'),
                 onTap: DesktopTabPage.onAddSetting,
               ),
             ],
@@ -153,34 +170,6 @@ class _GoTechField extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _GoTechIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _GoTechIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).textTheme.titleLarge?.color;
-    return Tooltip(
-      message: translate(tooltip),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(7),
-          child: Icon(icon, size: 18, color: color?.withOpacity(0.6)),
-        ),
-      ),
     );
   }
 }
