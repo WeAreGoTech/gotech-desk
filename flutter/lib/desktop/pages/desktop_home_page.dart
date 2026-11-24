@@ -27,6 +27,7 @@ import '../widgets/button.dart';
 import '../widgets/gotech_home.dart';
 import '../widgets/gotech_login.dart';
 import '../widgets/gotech_register.dart';
+import '../widgets/gotech_sidebar.dart';
 import '../widgets/gotech_simple_home.dart';
 
 class DesktopHomePage extends StatefulWidget {
@@ -187,16 +188,23 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   Widget buildGoTechHome(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final header = Column(
+    // logo, ID, password, status and account moved to the sidebar; only the notices stay on top
+    final banners = Column(
       children: [
         if (!isOutgoingOnly) buildPresetPasswordWarning(),
-        loadPowered(context),
-        loadLogo(),
-        const SizedBox(height: 14),
-        if (!isOutgoingOnly) const GoTechDeviceCard(),
-        if (!isOutgoingOnly) const GoTechRegistrationBar(),
+        if (!isOutgoingOnly)
+          Obx(() => goTechRegistrationBarNeeded
+              ? const GoTechRegistrationBar()
+              : const SizedBox.shrink()),
         const GoTechUpdateBar(),
         Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+      ],
+    );
+    final full = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GoTechSidebar(showDevice: !isOutgoingOnly),
+        Expanded(child: ConnectionPage(header: banners)),
       ],
     );
     return ChangeNotifierProvider.value(
@@ -204,7 +212,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: isOutgoingOnly
-            ? ConnectionPage(header: header)
+            ? full
             : Obx(() => goTechShowsSimpleHome
                 ? GoTechSimpleHome(
                     notices: Column(children: [
@@ -212,7 +220,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
                     ]),
                   )
-                : ConnectionPage(header: header)),
+                : full),
       ),
     );
   }

@@ -21,6 +21,26 @@ import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
+/// Reads the rendezvous connection state into [stateGlobal]. The status bar below and the GoTech sidebar
+/// poll it.
+Future<void> pollConnectStatus() async {
+  final status =
+      jsonDecode(await bind.mainGetConnectStatus()) as Map<String, dynamic>;
+  final statusNum = status['status_num'] as int;
+  if (statusNum == 0) {
+    stateGlobal.svcStatus.value = SvcStatus.connecting;
+  } else if (statusNum == -1) {
+    stateGlobal.svcStatus.value = SvcStatus.notReady;
+  } else if (statusNum == 1) {
+    stateGlobal.svcStatus.value = SvcStatus.ready;
+  } else {
+    stateGlobal.svcStatus.value = SvcStatus.notReady;
+  }
+  try {
+    stateGlobal.videoConnCount.value = status['video_conn_count'] as int;
+  } catch (_) {}
+}
+
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
       : super(key: key);
@@ -168,22 +188,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   }
 
   updateStatus() async {
-    final status =
-        jsonDecode(await bind.mainGetConnectStatus()) as Map<String, dynamic>;
-    final statusNum = status['status_num'] as int;
-    if (statusNum == 0) {
-      stateGlobal.svcStatus.value = SvcStatus.connecting;
-    } else if (statusNum == -1) {
-      stateGlobal.svcStatus.value = SvcStatus.notReady;
-    } else if (statusNum == 1) {
-      stateGlobal.svcStatus.value = SvcStatus.ready;
-    } else {
-      stateGlobal.svcStatus.value = SvcStatus.notReady;
-    }
+    await pollConnectStatus();
     _svcIsUsingPublicServer.value = await bind.mainIsUsingPublicServer();
-    try {
-      stateGlobal.videoConnCount.value = status['video_conn_count'] as int;
-    } catch (_) {}
   }
 }
 
@@ -308,7 +314,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   Widget build(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
     if (bind.isCustomClient()) {
-      return _buildGoTech(context, isOutgoingOnly);
+      return _buildGoTech(context);
     }
     return Column(
       children: [
@@ -677,30 +683,21 @@ class _ConnectionPageState extends State<ConnectionPage>
     );
   }
 
-  Widget _buildGoTech(BuildContext context, bool isOutgoingOnly) {
-    return Column(
-      children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: kGoTechContentWidth),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  if (widget.header != null) widget.header!,
-                  const SizedBox(height: 16),
-                  _buildRemoteIDTextField(context),
-                  const SizedBox(height: 22),
-                  Expanded(child: PeerTabPage()),
-                ],
-              ).paddingSymmetric(horizontal: 24),
-            ),
-          ),
-        ),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget(),
-      ],
+  /// The main area right of the GoTech sidebar: banners, the connect row and the peer table. The
+  /// connection status that used to sit in a bar at the bottom is in the sidebar now.
+  Widget _buildGoTech(BuildContext context) {
+    return Padding(
+      padding: kGoTechMainPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.header != null) widget.header!,
+          const SizedBox(height: kGoTechBannerGap),
+          _buildRemoteIDTextField(context),
+          const SizedBox(height: kGoTechConnectGap),
+          const Expanded(child: PeerTabPage(goTechLayout: true)),
+        ],
+      ),
     );
   }
 }

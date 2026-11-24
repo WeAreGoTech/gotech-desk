@@ -136,6 +136,11 @@ class GoTechUpdateBar extends StatelessWidget {
   }
 }
 
+/// The sidebar already says "ekip bilgisayarı" and holds the account, so a signed-in team computer needs
+/// no registration bar; everyone else still gets its sign-in prompt or "Destek iste".
+bool get goTechRegistrationBarNeeded => !(GoTechRegistration.isTeamMachine &&
+    gFFI.userModel.userName.value.isNotEmpty);
+
 /// One-line status under the device card: registered company or a prompt.
 class GoTechRegistrationBar extends StatelessWidget {
   const GoTechRegistrationBar({Key? key}) : super(key: key);

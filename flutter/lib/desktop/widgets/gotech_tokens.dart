@@ -4,14 +4,12 @@ import 'package:flutter/material.dart';
 // widget tests can load the GoTech views without the native bridge.
 
 const kGoTechRed = Color(0xFFE2463B);
-const kGoTechContentWidth = 680.0;
 const kGoTechRadius = 14.0;
 
 // main window: sidebar + main area
 const kGoTechOnline = Color(0xFF3FB950);
 const kGoTechFocus = Color(0xFF4A8EEA);
 const kGoTechStatusError = Color(0xFFE04F5F);
-const kGoTechStatusWarn = Color(0xFFF5853B);
 const kGoTechLineOpacity = 0.12;
 const kGoTechMutedOpacity = 0.62;
 const kGoTechFaintOpacity = 0.42;
