@@ -2351,6 +2351,13 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    // GoTech: fit the remote screen to the window by default. Upstream's desktop default is
+    // "original", which on a HiDPI (Retina) display draws the remote screen at half size.
+    // Set before reading custom.txt so a custom client config can still override it.
+    config::DEFAULT_DISPLAY_SETTINGS
+        .write()
+        .unwrap()
+        .insert(keys::OPTION_VIEW_STYLE.to_owned(), "adaptive".to_owned());
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
