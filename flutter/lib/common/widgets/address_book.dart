@@ -340,14 +340,19 @@ class _AddressBookState extends State<AddressBook> {
             showActionMenu: editPermission);
       }
 
-      gridView(bool isPortrait) => DynamicGridView.builder(
-          shrinkWrap: isPortrait,
-          gridDelegate: SliverGridDelegateWithWrapping(),
-          itemCount: tags.length,
-          itemBuilder: (BuildContext context, int index) {
-            final e = tags[index];
-            return tagBuilder(e);
-          });
+      // GoTech: the wrapping grid gives each tag unbounded width, so a long company name was
+      // painted past the panel over the peer cards. Cap every tag at the panel width so it ellipsizes.
+      gridView(bool isPortrait) => LayoutBuilder(
+          builder: (context, constraints) => DynamicGridView.builder(
+              shrinkWrap: isPortrait,
+              gridDelegate: SliverGridDelegateWithWrapping(),
+              itemCount: tags.length,
+              itemBuilder: (BuildContext context, int index) {
+                final e = tags[index];
+                return ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                    child: tagBuilder(e));
+              }));
       final maxHeight = max(MediaQuery.of(context).size.height / 6, 100.0);
       return Obx(() => stateGlobal.isPortrait.isFalse
           ? gridView(false)

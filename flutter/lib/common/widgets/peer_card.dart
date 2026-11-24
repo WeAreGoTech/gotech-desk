@@ -309,6 +309,8 @@ class _PeerCardState extends State<_PeerCard>
                   child: Container(
                     // GoTech: one calm surface for every card. RustDesk tinted each one from a hash
                     // of the id, which read as meaningful colour when it meant nothing.
+                    // Fill the card: the centred Column otherwise shrinks it to the text width.
+                    width: double.infinity,
                     color: Theme.of(context).colorScheme.onBackground.withOpacity(0.05),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     child: Column(
