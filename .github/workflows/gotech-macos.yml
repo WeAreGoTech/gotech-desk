@@ -18,7 +18,7 @@ jobs:
 
   build-macos:
     name: aarch64-apple-darwin
-    runs-on: macos-15
+    runs-on: macos-26
     needs: [generate-bridge]
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -74,7 +74,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          prefix-key: macos-15
+          prefix-key: macos-26
 
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
