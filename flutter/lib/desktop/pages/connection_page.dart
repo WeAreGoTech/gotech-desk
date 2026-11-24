@@ -20,6 +20,10 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
+import '../../desktop/widgets/gotech_connect_view.dart';
+import '../../desktop/widgets/gotech_peer_format.dart';
+import '../../desktop/widgets/gotech_peer_row.dart';
+import '../../desktop/widgets/gotech_rehber.dart';
 
 /// Reads the rendezvous connection state into [stateGlobal]. The status bar below and the GoTech sidebar
 /// poll it.
@@ -218,7 +222,13 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   bool isWindowMinimized = false;
 
-  final AllPeersLoader _allPeersLoader = AllPeersLoader();
+  final AllPeersLoader _allPeersLoader =
+      AllPeersLoader(includeFavorites: bind.isCustomClient());
+
+  // GoTech connect field search
+  final _goTechFieldKey = GlobalKey();
+  VoidCallback? _goTechSubmitField;
+  bool _goTechPicked = false;
 
   // https://github.com/flutter/flutter/issues/157244
   Iterable<Peer> _autocompleteOpts = [];
@@ -356,7 +366,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
     final goTech = bind.isCustomClient();
-    final idField = RawAutocomplete<Peer>(
+    final idField = goTech ? _buildGoTechIdField() : RawAutocomplete<Peer>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
                     if (textEditingValue.text == '') {
                       _autocompleteOpts = const Iterable<Peer>.empty();
@@ -411,42 +421,9 @@ class _ConnectionPageState extends State<ConnectionPage>
                     TextEditingController fieldTextEditingController,
                     FocusNode fieldFocusNode,
                     VoidCallback onFieldSubmitted,
-                  ) {
-                    updateTextAndPreserveSelection(
-                        fieldTextEditingController, _idController.text);
-                    return Obx(() => TextField(
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          keyboardType: TextInputType.visiblePassword,
-                          focusNode: fieldFocusNode,
-                          style: TextStyle(
-                            fontFamily: 'WorkSans',
-                            fontSize: goTech ? 20 : 22,
-                            height: goTech ? 1.2 : 1.4,
-                          ),
-                          maxLines: 1,
-                          cursorColor:
-                              Theme.of(context).textTheme.titleLarge?.color,
-                          decoration: goTech
-                              ? _goTechInputDecoration(context)
-                              : InputDecoration(
-                              filled: false,
-                              counterText: '',
-                              hintText: _idInputFocused.value
-                                  ? null
-                                  : translate('Enter Remote ID'),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 15, vertical: 13)),
-                          controller: fieldTextEditingController,
-                          inputFormatters: [IDTextInputFormatter()],
-                          onChanged: (v) {
-                            _idController.id = v;
-                          },
-                          onSubmitted: (_) {
-                            onConnect();
-                          },
-                        ).workaroundFreezeLinuxMint());
-                  },
+                  ) =>
+                      _idFieldView(context, fieldTextEditingController,
+                          fieldFocusNode, onConnect),
                   onSelected: (option) {
                     setState(() {
                       _idController.id = option.id;
@@ -527,7 +504,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                     borderRadius: BorderRadius.circular(12)))
             : null,
         onPressed: () {
-          onConnect();
+          goTech ? _goTechSubmit() : onConnect();
         },
         child: Text(translate("Connect"),
             style: goTech
@@ -663,6 +640,128 @@ class _ConnectionPageState extends State<ConnectionPage>
         constraints: const BoxConstraints(maxWidth: 600), child: w);
   }
 
+  /// GoTech: the ID field also finds computers and companies. Upstream's RawAutocomplete with GoTech
+  /// items: a direct connect for a typed ID, matching computers, matching companies.
+  Widget _buildGoTechIdField() {
+    return RawAutocomplete<GoTechConnectItem>(
+      focusNode: _idFocusNode,
+      textEditingController: _idEditingController,
+      // a company opens the address book and leaves the field empty for the next search
+      displayStringForOption: (item) =>
+          item.kind == GoTechConnectKind.company ? '' : formatID(item.id),
+      optionsBuilder: (value) {
+        final items = goTechConnectItems(value.text,
+            peers: _goTechPeers(), companies: goTechCompanyCounts());
+        final ids = items.map((e) => e.id).toSet();
+        _allPeersLoader
+            .queryOnlines(_allPeersLoader.peers.where((p) => ids.contains(p.id)));
+        return items;
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        _goTechSubmitField = onFieldSubmitted;
+        return KeyedSubtree(
+          key: _goTechFieldKey,
+          child: _idFieldView(context, controller, focusNode, _goTechSubmit),
+        );
+      },
+      onSelected: _goTechRun,
+      optionsViewBuilder: (context, onSelected, options) {
+        final field =
+            _goTechFieldKey.currentContext?.findRenderObject() as RenderBox?;
+        return Align(
+          alignment: Alignment.topLeft,
+          child: GoTechConnectDropView(
+            items: options.map(_goTechFresh).toList(),
+            highlighted: AutocompleteHighlightedOption.of(context),
+            onPick: onSelected,
+            companyColor: gFFI.abModel.getCurrentAbTagColor,
+            width: field?.size.width ?? kGoTechDropMinWidth,
+          ),
+        );
+      },
+    );
+  }
+
+  /// Every known computer, the address book entry first; the recent sessions are marked for ranking.
+  List<GoTechPeerInfo> _goTechPeers() {
+    final recent = {
+      ...gFFI.recentPeersModel.peers.map((p) => p.id),
+      ...gFFI.recentPeersModel.restPeerIds,
+    };
+    return _allPeersLoader.peers
+        .map((p) => goTechPeerInfo(p, recent: recent.contains(p.id)))
+        .toList();
+  }
+
+  /// The same item with the online state the loader learned since the list was built.
+  GoTechConnectItem _goTechFresh(GoTechConnectItem item) {
+    final old = item.peer;
+    if (old == null) return item;
+    final p = _allPeersLoader.peers.firstWhereOrNull((e) => e.id == old.id);
+    return p == null
+        ? item
+        : GoTechConnectItem.peer(goTechPeerInfo(p, recent: old.recent));
+  }
+
+  /// Enter or "Bağlan": run the highlighted item, or connect to the typed ID when none is shown.
+  void _goTechSubmit() {
+    _goTechPicked = false;
+    _goTechSubmitField?.call();
+    if (_goTechPicked) return;
+    _idFocusNode.unfocus();
+    onConnect();
+  }
+
+  void _goTechRun(GoTechConnectItem item) {
+    _goTechPicked = true;
+    _idFocusNode.unfocus();
+    if (item.kind == GoTechConnectKind.company) {
+      setState(() => _idController.id = '');
+      goTechOpenCompany(item.company);
+      return;
+    }
+    setState(() => _idController.id = item.id);
+    onConnect();
+  }
+
+  /// The remote ID text field. Upstream's autocomplete and the GoTech one both build it.
+  Widget _idFieldView(BuildContext context, TextEditingController controller,
+      FocusNode focusNode, VoidCallback onSubmitted) {
+    final goTech = bind.isCustomClient();
+    updateTextAndPreserveSelection(controller, _idController.text);
+    return Obx(() => TextField(
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: TextInputType.visiblePassword,
+          focusNode: focusNode,
+          style: TextStyle(
+            fontFamily: 'WorkSans',
+            fontSize: goTech ? 20 : 22,
+            height: goTech ? 1.2 : 1.4,
+          ),
+          maxLines: 1,
+          cursorColor: Theme.of(context).textTheme.titleLarge?.color,
+          decoration: goTech
+              ? _goTechInputDecoration(context)
+              : InputDecoration(
+              filled: false,
+              counterText: '',
+              hintText: _idInputFocused.value
+                  ? null
+                  : translate('Enter Remote ID'),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15, vertical: 13)),
+          controller: controller,
+          inputFormatters: [IDTextInputFormatter()],
+          onChanged: (v) {
+            _idController.id = v;
+          },
+          onSubmitted: (_) {
+            onSubmitted();
+          },
+        ).workaroundFreezeLinuxMint());
+  }
+
   InputDecoration _goTechInputDecoration(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
@@ -673,7 +772,8 @@ class _ConnectionPageState extends State<ConnectionPage>
       filled: true,
       fillColor: Theme.of(context).cardColor,
       counterText: '',
-      hintText: _idInputFocused.value ? null : translate('Enter Remote ID'),
+      // the field searches the known computers and companies too
+      hintText: _idInputFocused.value ? null : 'ID, firma ya da kişi adı yaz',
       prefixIcon: const Icon(Icons.desktop_windows_outlined, size: 20),
       border: border,
       enabledBorder: border,

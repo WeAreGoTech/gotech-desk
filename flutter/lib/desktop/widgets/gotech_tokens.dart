@@ -72,6 +72,7 @@ const kGoTechDropRadius = 12.0;
 const kGoTechDropPadding = 6.0;
 const kGoTechDropGap = 6.0;
 const kGoTechDropMaxHeight = 352.0;
+const kGoTechDropMinWidth = 360.0;
 const kGoTechDropItemPadding =
     EdgeInsets.symmetric(horizontal: 10, vertical: 8);
 const kGoTechDropSectionPadding = EdgeInsets.fromLTRB(10, 8, 10, 4);

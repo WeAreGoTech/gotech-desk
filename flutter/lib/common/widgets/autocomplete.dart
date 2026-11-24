@@ -13,6 +13,7 @@ List<Peer> mergeAutocompletePeers({
   Iterable<Peer> addressBookPeers = const [],
   Iterable<Peer> groupPeers = const [],
   Iterable<Peer> lanPeers = const [],
+  Iterable<Peer> favoritePeers = const [],
   Iterable<Peer> recentPeers = const [],
   Iterable<String> restRecentPeerIds = const [],
 }) {
@@ -37,6 +38,9 @@ List<Peer> mergeAutocompletePeers({
     addPeer(peer);
   }
   for (final peer in lanPeers) {
+    addPeer(peer);
+  }
+  for (final peer in favoritePeers) {
     addPeer(peer);
   }
   for (final peer in recentPeers) {
@@ -107,6 +111,9 @@ class AllPeersLoader {
   Set<String> _lastOfflineIds = {};
   final Future<void> Function(List<String> ids) _queryOnlines;
   final Duration _queryOnlineDebounce;
+
+  /// GoTech: the connect field also finds favorites.
+  final bool includeFavorites;
   void Function(VoidCallback)? _setState;
   bool _isCleared = false;
 
@@ -123,6 +130,7 @@ class AllPeersLoader {
   AllPeersLoader({
     @visibleForTesting Future<void> Function(List<String> ids)? queryOnlines,
     @visibleForTesting Duration? queryOnlineDebounce,
+    this.includeFavorites = false,
   })  : _queryOnlines = queryOnlines ?? ((ids) => bind.queryOnlines(ids: ids)),
         _queryOnlineDebounce =
             queryOnlineDebounce ?? _defaultQueryOnlineDebounce;
@@ -132,6 +140,7 @@ class AllPeersLoader {
     _isCleared = false;
     gFFI.recentPeersModel.addListener(_mergeAllPeers);
     gFFI.lanPeersModel.addListener(_mergeAllPeers);
+    if (includeFavorites) gFFI.favoritePeersModel.addListener(_mergeAllPeers);
     gFFI.abModel.addPeerUpdateListener(_listenerKey, _mergeAllPeers);
     gFFI.groupModel.addPeerUpdateListener(_listenerKey, _mergeAllPeers);
     platformFFI.registerEventHandler(_cbQueryOnlines, _listenerKey,
@@ -143,6 +152,9 @@ class AllPeersLoader {
   void clear() {
     gFFI.recentPeersModel.removeListener(_mergeAllPeers);
     gFFI.lanPeersModel.removeListener(_mergeAllPeers);
+    if (includeFavorites) {
+      gFFI.favoritePeersModel.removeListener(_mergeAllPeers);
+    }
     gFFI.abModel.removePeerUpdateListener(_listenerKey);
     gFFI.groupModel.removePeerUpdateListener(_listenerKey);
     platformFFI.unregisterEventHandler(_cbQueryOnlines, _listenerKey);
@@ -164,6 +176,9 @@ class AllPeersLoader {
     if (gFFI.lanPeersModel.peers.isEmpty) {
       bind.mainLoadLanPeers();
     }
+    if (includeFavorites && gFFI.favoritePeersModel.peers.isEmpty) {
+      bind.mainLoadFavPeers();
+    }
     // No need to care about peers from abModel, and group model.
     // Because they will pull data in `refreshCurrentUser()` on startup.
 
@@ -183,6 +198,8 @@ class AllPeersLoader {
       addressBookPeers: gFFI.abModel.allPeers(),
       groupPeers: gFFI.groupModel.peers,
       lanPeers: gFFI.lanPeersModel.peers,
+      favoritePeers:
+          includeFavorites ? gFFI.favoritePeersModel.peers : const [],
       recentPeers: gFFI.recentPeersModel.peers,
       restRecentPeerIds: gFFI.recentPeersModel.restPeerIds,
     );
