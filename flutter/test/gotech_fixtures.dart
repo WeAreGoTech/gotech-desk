@@ -80,7 +80,7 @@ List<GoTechCompanyData> fixtureCompanies(String query) => [
       for (final c in kCompanyColors.keys)
         () {
           final n = kFixturePeers
-              .where((p) => p.company == c && p.matches(query))
+              .where((p) => p.company == c && p.matches(GoTechQuery(query)))
               .length;
           return GoTechCompanyData(
               tag: c,

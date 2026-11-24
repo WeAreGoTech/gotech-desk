@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/peer_tab_page.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
-import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 
 import 'gotech_rehber.dart';
@@ -17,13 +15,6 @@ const _kSearchHint = 'Kişi, firma, bilgisayar adı ya da ID ara';
 const _kSearchIconSize = 16.0;
 const _kSearchContentPadding =
     EdgeInsets.symmetric(horizontal: 10, vertical: 9);
-
-Peers _peersOf(int tab) {
-  if (tab == PeerTabIndex.recent.index) return gFFI.recentPeersModel;
-  if (tab == PeerTabIndex.fav.index) return gFFI.favoritePeersModel;
-  if (tab == PeerTabIndex.lan.index) return gFFI.lanPeersModel;
-  return gFFI.abModel.peersModel;
-}
 
 class _SearchField extends StatefulWidget {
   const _SearchField();
@@ -99,15 +90,10 @@ class _SearchFieldState extends State<_SearchField> {
 }
 
 class _OnlineOnlyBox extends StatelessWidget {
-  final int tab;
-  const _OnlineOnlyBox({required this.tab});
+  const _OnlineOnlyBox();
 
-  void _toggle(bool on) {
-    peerOnlineOnly.value = on;
-    // the lists only ask about the rows on screen; get every peer's state once before hiding the offline ones
-    final ids = _peersOf(tab).peers.map((p) => p.id).toList();
-    if (on && ids.isNotEmpty) bind.queryOnlines(ids: ids);
-  }
+  // the list keeps polling the offline peers it hides, so they come back once they are online
+  void _toggle(bool on) => peerOnlineOnly.value = on;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +148,7 @@ class GoTechPeerToolbar extends StatelessWidget {
     return Row(children: [
       const Expanded(child: _SearchField()),
       const SizedBox(width: kGoTechToolbarGap),
-      _OnlineOnlyBox(tab: tab),
+      const _OnlineOnlyBox(),
       if (tab != PeerTabIndex.recent.index) const PeerSortDropdown(),
       GoTechMoreButton(
           onTap: (p) => _menu(context, p), tooltip: 'Liste menüsü'),

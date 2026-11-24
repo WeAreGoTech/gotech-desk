@@ -8,6 +8,7 @@ import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 
+import 'gotech_peer_format.dart';
 import 'gotech_peer_row.dart';
 import 'gotech_sidebar_view.dart';
 import 'gotech_table_view.dart';
@@ -16,6 +17,11 @@ import 'gotech_table_view.dart';
 
 const kGoTechNoCompany = 'Firması yok';
 const kGoTechAllComputers = 'Tüm bilgisayarlar';
+
+/// The sidebar may switch to [tab]: it is shown and the tab is not fixed by an option.
+bool goTechCanSelectTab(int tab) =>
+    !isOptionFixed(kOptionPeerTabIndex) &&
+    gFFI.peerTabModel.visibleEnabledOrderedIndexs.contains(tab);
 
 /// Switches the peer tab like a click on the old tab strip, which the GoTech layout no longer has.
 Future<void> goTechSelectPeerTab(int tab) async {
@@ -28,10 +34,19 @@ Future<void> goTechSelectPeerTab(int tab) async {
   await bind.setLocalFlutterOption(k: kOptionPeerTabIndex, v: tab.toString());
 }
 
-/// The selected company tag, or null for all computers.
+bool _companyExists(String tag) =>
+    tag == kUntagged || gFFI.abModel.currentAbTags.contains(tag);
+
+/// The selected company tag, or null for all computers. A company that left the address book in a
+/// refresh counts as all computers, and the selection is dropped after this frame.
 String? goTechSelectedCompany() {
   final tags = gFFI.abModel.selectedTags;
-  return tags.isEmpty ? null : tags.first;
+  if (tags.isEmpty) return null;
+  final tag = tags.first;
+  if (_companyExists(tag)) return tag;
+  WidgetsBinding.instance
+      .addPostFrameCallback((_) => goTechSelectCompany(null));
+  return null;
 }
 
 void goTechSelectCompany(String? tag) {
@@ -45,10 +60,17 @@ void goTechSelectCompany(String? tag) {
   }
 }
 
-/// Opens the address book on one company, from the connect field's dropdown.
+/// Opens the address book on one company, from the connect field's dropdown. Does nothing when the
+/// company is gone or the address book tab can't be shown.
 Future<void> goTechOpenCompany(String tag) async {
-  goTechSelectCompany(tag);
-  await goTechSelectPeerTab(PeerTabIndex.ab.index);
+  if (!_companyExists(tag)) return;
+  final ab = PeerTabIndex.ab.index;
+  if (gFFI.peerTabModel.currentTab == ab) {
+    goTechSelectCompany(tag);
+  } else if (goTechCanSelectTab(ab)) {
+    goTechSelectCompany(tag);
+    await goTechSelectPeerTab(ab);
+  }
 }
 
 String goTechCompanyTitle(String? tag) => tag == null
@@ -63,10 +85,12 @@ bool _inCompany(Peer p, String? tag) {
   return p.tags.contains(tag);
 }
 
+/// The toolbar search, prepared once for a pass over the peers.
+GoTechQuery goTechSearchQuery() => GoTechQuery(peerSearchText.value);
+
 /// Passes the toolbar search and the "Sadece çevrimiçi" box.
-bool goTechPassesFilters(Peer p) =>
-    (!peerOnlineOnly.value || p.online) &&
-    goTechPeerMatches(peerSearchText.value, p);
+bool goTechPassesFilters(Peer p, GoTechQuery query) =>
+    (!peerOnlineOnly.value || p.online) && goTechPeerMatches(query, p);
 
 List<String> goTechAbTags() {
   final tags = gFFI.abModel.currentAbTags.toList();
@@ -76,34 +100,49 @@ List<String> goTechAbTags() {
 
 /// Every company with its number of computers, for the connect field's dropdown.
 Map<String, int> goTechCompanyCounts() {
-  final peers = gFFI.abModel.currentAbPeers;
-  return {
-    for (final t in goTechAbTags())
-      t: peers.where((p) => p.tags.contains(t)).length,
-  };
-}
-
-/// The companies in the sidebar. While searching, the counts are matches and empty companies dim.
-List<GoTechCompanyData> goTechCompanyList() {
-  final peers = gFFI.abModel.currentAbPeers;
-  final searching = peerSearchText.value.trim().isNotEmpty;
-  GoTechCompanyData item(String tag, String name, Color? color) {
-    final n =
-        peers.where((p) => _inCompany(p, tag) && goTechPassesFilters(p)).length;
-    return GoTechCompanyData(
-        tag: tag, name: name, color: color, count: n, dim: searching && n == 0);
+  final counts = {for (final t in goTechAbTags()) t: 0};
+  for (final p in gFFI.abModel.currentAbPeers) {
+    for (final t in p.tags) {
+      final n = counts[t.toString()];
+      if (n != null) counts[t.toString()] = n + 1;
+    }
   }
-
-  return [
-    for (final t in goTechAbTags())
-      item(t, t, gFFI.abModel.getCurrentAbTagColor(t)),
-    if (peers.any((p) => p.tags.isEmpty))
-      item(kUntagged, kGoTechNoCompany, null),
-  ];
+  return counts;
 }
 
-int goTechVisiblePeerCount() =>
-    gFFI.abModel.currentAbPeers.where(goTechPassesFilters).length;
+/// The sidebar list in one pass over the address book: the computers passing the filters, in all and
+/// per company. While searching, companies without a match dim.
+({int all, List<GoTechCompanyData> companies}) goTechCompanyTally() {
+  final query = goTechSearchQuery();
+  final counts = <String, int>{};
+  var all = 0;
+  var untagged = 0;
+  var anyUntagged = false;
+  for (final p in gFFI.abModel.currentAbPeers) {
+    if (p.tags.isEmpty) anyUntagged = true;
+    if (!goTechPassesFilters(p, query)) continue;
+    all++;
+    if (p.tags.isEmpty) untagged++;
+    for (final t in p.tags) {
+      counts[t.toString()] = (counts[t.toString()] ?? 0) + 1;
+    }
+  }
+  GoTechCompanyData item(String tag, String name, Color? color, int n) =>
+      GoTechCompanyData(
+          tag: tag,
+          name: name,
+          color: color,
+          count: n,
+          dim: !query.isEmpty && n == 0);
+  return (
+    all: all,
+    companies: [
+      for (final t in goTechAbTags())
+        item(t, t, gFFI.abModel.getCurrentAbTagColor(t), counts[t] ?? 0),
+      if (anyUntagged) item(kUntagged, kGoTechNoCompany, null, untagged),
+    ],
+  );
+}
 
 /// The address book box: the selected company, its counts and the rows.
 class GoTechAbBox extends StatelessWidget {
@@ -112,6 +151,21 @@ class GoTechAbBox extends StatelessWidget {
   const GoTechAbBox({Key? key, required this.rows, this.onMore})
       : super(key: key);
 
+  String _subtitle(String? tag) {
+    final query = goTechSearchQuery();
+    var total = 0;
+    var online = 0;
+    var hits = 0;
+    for (final p in gFFI.abModel.currentAbPeers) {
+      if (!_inCompany(p, tag)) continue;
+      total++;
+      if (p.online) online++;
+      if (!query.isEmpty && goTechPassesFilters(p, query)) hits++;
+    }
+    final counts = '$total bilgisayar, $online çevrimiçi';
+    return query.isEmpty ? counts : '$counts. Aramaya uyan: $hits';
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = ListenableBuilder(
@@ -119,17 +173,10 @@ class GoTechAbBox extends StatelessWidget {
       listenable: gFFI.abModel.peersModel,
       builder: (context, _) => Obx(() {
         final tag = goTechSelectedCompany();
-        final scope = gFFI.abModel.currentAbPeers
-            .where((p) => _inCompany(p, tag))
-            .toList();
-        final online = scope.where((p) => p.online).length;
-        var subtitle = '${scope.length} bilgisayar, $online çevrimiçi';
-        if (peerSearchText.value.trim().isNotEmpty) {
-          subtitle +=
-              '. Aramaya uyan: ${scope.where(goTechPassesFilters).length}';
-        }
         return GoTechBoxTitle(
-            title: goTechCompanyTitle(tag), subtitle: subtitle, onMore: onMore);
+            title: goTechCompanyTitle(tag),
+            subtitle: _subtitle(tag),
+            onMore: onMore);
       }),
     );
     return GoTechTableBox(title: title, rows: rows);

@@ -64,24 +64,38 @@ bool goTechIsDigitQuery(String query) =>
 
 String goTechStripSpaces(String text) => text.replaceAll(_spaces, '');
 
-/// The one search rule of the GoTech lists and the connect field. It looks in the alias, the hostname,
-/// the company tags and the ID; digits also match the ID with its spaces ignored.
-bool goTechMatches(
-  String query, {
+/// The folded text a search looks in: alias, hostname, ID and company tags. Worth caching per peer.
+String goTechHaystack({
   required String id,
   required String alias,
   required String hostname,
   required Iterable<String> tags,
-}) {
-  final q = query.trim();
-  if (q.isEmpty) return true;
-  if (goTechIsDigitQuery(q) &&
-      goTechStripSpaces(id).contains(goTechStripSpaces(q))) {
-    return true;
+}) =>
+    goTechNormalize([alias, hostname, id, ...tags].join('\n'));
+
+/// A search text prepared once, then matched against many peers: the one search rule of the GoTech lists
+/// and the connect field. Digits also match the ID with its spaces ignored.
+class GoTechQuery {
+  final String text;
+  final String normalized;
+  final bool digits;
+
+  /// [text] without spaces, for ID matching.
+  final String typedId;
+
+  GoTechQuery(String raw)
+      : text = raw.trim(),
+        normalized = goTechNormalize(raw.trim()),
+        digits = goTechIsDigitQuery(raw.trim()),
+        typedId = goTechStripSpaces(raw);
+
+  bool get isEmpty => text.isEmpty;
+
+  bool matches({required String id, required String haystack}) {
+    if (isEmpty) return true;
+    if (digits && goTechStripSpaces(id).contains(typedId)) return true;
+    return haystack.contains(normalized);
   }
-  final n = goTechNormalize(q);
-  return [alias, hostname, id, ...tags]
-      .any((f) => goTechNormalize(f).contains(n));
 }
 
 /// A peer as the GoTech views need it, free of the native models.
@@ -96,8 +110,9 @@ class GoTechPeerInfo {
   /// We connected to it before: it is in the recent sessions.
   final bool recent;
   final DateTime? lastSeen;
+  String? _haystack;
 
-  const GoTechPeerInfo({
+  GoTechPeerInfo({
     required this.id,
     this.alias = '',
     this.hostname = '',
@@ -106,12 +121,15 @@ class GoTechPeerInfo {
     this.online = false,
     this.recent = false,
     this.lastSeen,
-  });
+    String? haystack,
+  }) : _haystack = haystack;
 
   String get company => tags.isEmpty ? '' : tags.first;
 
-  bool matches(String query) => goTechMatches(query,
-      id: id, alias: alias, hostname: hostname, tags: tags);
+  String get haystack => _haystack ??=
+      goTechHaystack(id: id, alias: alias, hostname: hostname, tags: tags);
+
+  bool matches(GoTechQuery query) => query.matches(id: id, haystack: haystack);
 }
 
 /// The panel puts the hostname in the alias when nobody is named; that counts as no name.
@@ -180,7 +198,8 @@ class GoTechConnectItem {
         peer = null;
 }
 
-int _rankPeers(GoTechPeerInfo a, GoTechPeerInfo b, String idPrefix) {
+int _rankPeers(GoTechPeerInfo a, GoTechPeerInfo b, String idPrefix,
+    Map<GoTechPeerInfo, String> names) {
   int flag(bool v) => v ? 0 : 1;
   if (idPrefix.isNotEmpty) {
     final c = flag(goTechStripSpaces(a.id).startsWith(idPrefix))
@@ -191,35 +210,33 @@ int _rankPeers(GoTechPeerInfo a, GoTechPeerInfo b, String idPrefix) {
   if (recent != 0) return recent;
   final online = flag(a.online).compareTo(flag(b.online));
   if (online != 0) return online;
-  return goTechNormalize(goTechPeerTitle(a))
-      .compareTo(goTechNormalize(goTechPeerTitle(b)));
+  return names[a]!.compareTo(names[b]!);
 }
 
-/// The connect field's dropdown: a direct-connect line for a typed ID, then matching computers
-/// (ID prefix, then earlier sessions, then online, then name), then matching companies.
+/// The connect field's dropdown: a direct-connect line for a typed ID nobody in the list has, then
+/// matching computers (ID prefix, then earlier sessions, then online, then name), then matching companies.
 List<GoTechConnectItem> goTechConnectItems(
-  String query, {
+  GoTechQuery query, {
   required List<GoTechPeerInfo> peers,
   required Map<String, int> companies,
 }) {
-  final q = query.trim();
-  if (q.isEmpty) return const [];
-  final digits = goTechIsDigitQuery(q);
-  final typedId = goTechStripSpaces(q);
-  final items = <GoTechConnectItem>[];
-  if (digits && typedId.length >= kGoTechMinDirectIdLength) {
-    items.add(GoTechConnectItem.direct(typedId));
-  }
-  final hits = peers.where((p) => p.matches(q)).toList()
-    ..sort((a, b) => _rankPeers(a, b, digits ? typedId : ''));
-  items
-      .addAll(hits.take(kGoTechMaxPeerSuggestions).map(GoTechConnectItem.peer));
-  if (!digits) {
-    final n = goTechNormalize(q);
-    items.addAll(companies.entries
-        .where((e) => goTechNormalize(e.key).contains(n))
-        .take(kGoTechMaxCompanySuggestions)
-        .map((e) => GoTechConnectItem.company(e.key, e.value)));
-  }
-  return items;
+  if (query.isEmpty) return const [];
+  final hits = peers.where((p) => p.matches(query)).toList();
+  final names = {for (final p in hits) p: goTechNormalize(goTechPeerTitle(p))};
+  final idPrefix = query.digits ? query.typedId : '';
+  hits.sort((a, b) => _rankPeers(a, b, idPrefix, names));
+  final known = hits.any((p) => goTechStripSpaces(p.id) == query.typedId);
+  return [
+    // a known ID shows up as its computer, with the name, instead
+    if (query.digits &&
+        query.typedId.length >= kGoTechMinDirectIdLength &&
+        !known)
+      GoTechConnectItem.direct(query.typedId),
+    ...hits.take(kGoTechMaxPeerSuggestions).map(GoTechConnectItem.peer),
+    if (!query.digits)
+      ...companies.entries
+          .where((e) => goTechNormalize(e.key).contains(query.normalized))
+          .take(kGoTechMaxCompanySuggestions)
+          .map((e) => GoTechConnectItem.company(e.key, e.value)),
+  ];
 }

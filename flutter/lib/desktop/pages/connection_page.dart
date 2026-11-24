@@ -650,8 +650,10 @@ class _ConnectionPageState extends State<ConnectionPage>
       displayStringForOption: (item) =>
           item.kind == GoTechConnectKind.company ? '' : formatID(item.id),
       optionsBuilder: (value) {
-        final items = goTechConnectItems(value.text,
-            peers: _goTechPeers(), companies: goTechCompanyCounts());
+        final query = GoTechQuery(value.text);
+        if (query.isEmpty) return const [];
+        final items = goTechConnectItems(query,
+            peers: _goTechHits(query), companies: goTechCompanyCounts());
         final ids = items.map((e) => e.id).toSet();
         _allPeersLoader
             .queryOnlines(_allPeersLoader.peers.where((p) => ids.contains(p.id)));
@@ -682,15 +684,18 @@ class _ConnectionPageState extends State<ConnectionPage>
     );
   }
 
-  /// Every known computer, the address book entry first; the recent sessions are marked for ranking.
-  List<GoTechPeerInfo> _goTechPeers() {
+  /// The known computers matching [query] (the address book entry wins a shared ID), with the recent
+  /// sessions marked for ranking. Peers keep their folded search text, so a keystroke only re-checks it.
+  List<GoTechPeerInfo> _goTechHits(GoTechQuery query) {
     final recent = {
       ...gFFI.recentPeersModel.peers.map((p) => p.id),
       ...gFFI.recentPeersModel.restPeerIds,
     };
-    return _allPeersLoader.peers
-        .map((p) => goTechPeerInfo(p, recent: recent.contains(p.id)))
-        .toList();
+    return [
+      for (final p in _allPeersLoader.peers)
+        if (goTechPeerMatches(query, p))
+          goTechPeerInfo(p, recent: recent.contains(p.id)),
+    ];
   }
 
   /// The same item with the online state the loader learned since the list was built.

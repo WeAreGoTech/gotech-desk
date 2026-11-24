@@ -16,6 +16,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../common.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
+import '../../desktop/widgets/gotech_peer_format.dart';
 import '../../desktop/widgets/gotech_peer_row.dart';
 import 'peer_card.dart';
 
@@ -105,6 +106,12 @@ class _PeersViewState extends State<_PeersView>
   });
   final space = (isDesktop || isWebDesktop) ? 12.0 : 8.0;
   final _curPeers = <String>{};
+  // GoTech "Sadece çevrimiçi": offline peers are not rendered, so the poller asks about the list as it was
+  // before that filter, capped like the rendered list
+  static const int _maxPolledPeers = 1000;
+  var _beforeOnlineFilter = <String>{};
+  Set<String> get _pollPeers =>
+      widget.goTech && peerOnlineOnly.value ? _beforeOnlineFilter : _curPeers;
   var _lastChangeTime = DateTime.now();
   var _lastQueryPeers = <String>{};
   var _lastQueryTime = DateTime.now();
@@ -343,7 +350,7 @@ class _PeersViewState extends State<_PeersView>
       }
       while (!_exit) {
         final now = DateTime.now();
-        if (!setEquals(_curPeers, _lastQueryPeers)) {
+        if (!setEquals(_pollPeers, _lastQueryPeers)) {
           if (now.difference(_lastChangeTime) > const Duration(seconds: 1)) {
             _queryOnlines(false);
           }
@@ -355,8 +362,8 @@ class _PeersViewState extends State<_PeersView>
           final skipIfNotActive = skipIfIsWeb || skipIfMobile || !_isActive;
           if (!skipIfNotActive && (_queryCount < _maxQueryCount || !p)) {
             if (now.difference(_lastQueryTime) >= _queryInterval) {
-              if (_curPeers.isNotEmpty) {
-                bind.queryOnlines(ids: _curPeers.toList(growable: false));
+              if (_pollPeers.isNotEmpty) {
+                bind.queryOnlines(ids: _pollPeers.toList(growable: false));
                 _lastQueryTime = DateTime.now();
                 _queryCount += 1;
               }
@@ -369,11 +376,11 @@ class _PeersViewState extends State<_PeersView>
   }
 
   _queryOnlines(bool isLoadEvent) {
-    if (_curPeers.isNotEmpty) {
-      bind.queryOnlines(ids: _curPeers.toList(growable: false));
+    if (_pollPeers.isNotEmpty) {
+      bind.queryOnlines(ids: _pollPeers.toList(growable: false));
       _queryCount = 0;
     }
-    _lastQueryPeers = {..._curPeers};
+    _lastQueryPeers = {..._pollPeers};
     if (isLoadEvent) {
       _lastChangeTime = DateTime.now();
     } else {
@@ -388,6 +395,8 @@ class _PeersViewState extends State<_PeersView>
       peers = peers.where((peer) => widget.peerFilter!(peer)).toList();
     }
     if (onlineOnly) {
+      _beforeOnlineFilter =
+          peers.take(_maxPolledPeers).map((peer) => peer.id).toSet();
       peers = peers.where((peer) => peer.online).toList();
     }
 
@@ -424,7 +433,8 @@ class _PeersViewState extends State<_PeersView>
       return peers;
     }
     if (widget.goTech) {
-      return peers.where((peer) => goTechPeerMatches(searchText, peer)).toList();
+      final query = GoTechQuery(searchText);
+      return peers.where((peer) => goTechPeerMatches(query, peer)).toList();
     }
     searchText = searchText.toLowerCase();
     final matches = await Future.wait(

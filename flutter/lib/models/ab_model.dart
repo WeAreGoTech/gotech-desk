@@ -623,7 +623,8 @@ class AbModel {
         "name": key,
         "tags": value.tags,
         "peers": value.peers
-            .map((e) => e.toCustomJson(includingHash: value.isPersonal()))
+            .map((e) => e.toCustomJson(
+                includingHash: value.isPersonal(), includingLastSeen: true))
             .toList(),
         "tag_colors": jsonEncode(value.tagColors)
       });

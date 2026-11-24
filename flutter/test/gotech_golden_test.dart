@@ -92,7 +92,8 @@ Widget _sidebar(Widget logo, {String? selected, String query = ''}) {
             icon: icon, label: label, selected: label == 'Rehber', onTap: none),
     ],
     companies: GoTechCompanyList(
-      allCount: kFixturePeers.where((p) => p.matches(query)).length,
+      allCount:
+          kFixturePeers.where((p) => p.matches(GoTechQuery(query))).length,
       companies: fixtureCompanies(query),
       selected: selected,
       onSelect: (_) {},
@@ -140,7 +141,7 @@ Widget _main(
     Widget? dropdown}) {
   bool inScope(GoTechPeerInfo p) => selected == null || p.company == selected;
   final all = kFixturePeers.where(inScope).toList();
-  final rows = all.where((p) => p.matches(query)).toList()
+  final rows = all.where((p) => p.matches(GoTechQuery(query))).toList()
     ..sort(_byOnlineThenName);
   final online = all.where((p) => p.online).length;
   final showCompany = selected == null || query.isNotEmpty;
@@ -187,7 +188,7 @@ Widget _main(
 }
 
 Widget _drop(String query) => GoTechConnectDropView(
-      items: goTechConnectItems(query,
+      items: goTechConnectItems(GoTechQuery(query),
           peers: kFixturePeers, companies: fixtureCompanyCounts()),
       highlighted: 0,
       onPick: (_) {},

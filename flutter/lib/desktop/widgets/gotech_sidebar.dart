@@ -70,7 +70,6 @@ class GoTechSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<PeerTabModel>(builder: (context, model, _) {
       final tabs = model.visibleEnabledOrderedIndexs;
-      final fixed = isOptionFixed(kOptionPeerTabIndex);
       final abAt = tabs.indexOf(PeerTabIndex.ab.index);
       final showCompanies =
           abAt >= 0 && model.currentTab == PeerTabIndex.ab.index;
@@ -82,7 +81,8 @@ class GoTechSidebar extends StatelessWidget {
               icon: _kTabIcons[t],
               label: _kTabLabels[t],
               selected: model.currentTab == t,
-              onTap: fixed ? null : () => goTechSelectPeerTab(t),
+              onTap:
+                  goTechCanSelectTab(t) ? () => goTechSelectPeerTab(t) : null,
             ),
         ],
         companies: showCompanies ? const _Companies() : null,
@@ -110,9 +110,10 @@ class _Companies extends StatelessWidget {
       listenable: gFFI.abModel.peersModel,
       builder: (context, _) => Obx(() {
         if (!gFFI.userModel.isLogin) return const SizedBox.shrink();
+        final tally = goTechCompanyTally();
         return GoTechCompanyList(
-          allCount: goTechVisiblePeerCount(),
-          companies: goTechCompanyList(),
+          allCount: tally.all,
+          companies: tally.companies,
           selected: goTechSelectedCompany(),
           onSelect: goTechSelectCompany,
         );

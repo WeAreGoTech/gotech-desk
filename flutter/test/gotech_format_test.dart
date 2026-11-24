@@ -11,7 +11,7 @@ void main() {
   });
 
   group('goTechMatches', () {
-    bool m(String q, GoTechPeerInfo p) => p.matches(q);
+    bool m(String q, GoTechPeerInfo p) => p.matches(GoTechQuery(q));
     final dilara = kFixturePeers.firstWhere((p) => p.alias == 'Dilara Aydın');
     final emre = kFixturePeers.firstWhere((p) => p.alias == 'Emre Koç');
     final testPc = kFixturePeers.firstWhere((p) => p.id == '229814507');
@@ -37,19 +37,19 @@ void main() {
 
   group('row texts', () {
     test('alias equal to hostname counts as no name', () {
-      const p = GoTechPeerInfo(id: '1', alias: 'ykm-srv', hostname: 'YKM-SRV');
+      final p = GoTechPeerInfo(id: '1', alias: 'ykm-srv', hostname: 'YKM-SRV');
       expect(goTechPeerTitle(p), 'YKM-SRV');
       expect(goTechPeerDetail(p), kGoTechNoName);
     });
 
     test('named person shows the hostname below', () {
-      const p = GoTechPeerInfo(id: '1', alias: 'Kasa', hostname: 'KMA-KASA');
+      final p = GoTechPeerInfo(id: '1', alias: 'Kasa', hostname: 'KMA-KASA');
       expect(goTechPeerTitle(p), 'Kasa');
       expect(goTechPeerDetail(p), 'KMA-KASA');
     });
 
     test('no alias and no hostname shows the ID', () {
-      const p = GoTechPeerInfo(id: '229814507');
+      final p = GoTechPeerInfo(id: '229814507');
       expect(goTechPeerTitle(p), '229 814 507');
     });
   });
@@ -79,8 +79,9 @@ void main() {
   });
 
   group('goTechConnectItems', () {
-    List<GoTechConnectItem> items(String q) => goTechConnectItems(q,
-        peers: kFixturePeers, companies: fixtureCompanyCounts());
+    List<GoTechConnectItem> items(String q) =>
+        goTechConnectItems(GoTechQuery(q),
+            peers: kFixturePeers, companies: fixtureCompanyCounts());
 
     test('a short ID lists matching computers, the recent one first', () {
       final r = items('2298');
@@ -88,11 +89,16 @@ void main() {
       expect(r.map((e) => e.id), ['229871230', '229814507']);
     });
 
-    test('a full ID starts with a direct connect', () {
+    test('a full unknown ID starts with a direct connect', () {
+      final r = items('555 666 777');
+      expect(r.single.kind, GoTechConnectKind.direct);
+      expect(r.single.id, '555666777');
+    });
+
+    test('a full known ID lists its computer, not a second direct row', () {
       final r = items('229 814 507');
-      expect(r.first.kind, GoTechConnectKind.direct);
-      expect(r.first.id, '229814507');
-      expect(r[1].id, '229814507');
+      expect(r.single.kind, GoTechConnectKind.peer);
+      expect(r.single.id, '229814507');
     });
 
     test('a name lists computers, then companies', () {

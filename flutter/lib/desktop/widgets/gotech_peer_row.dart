@@ -18,6 +18,21 @@ import 'gotech_view_parts.dart';
 /// The row the user clicked last, across all tabs.
 final goTechSelectedPeerId = ''.obs;
 
+// peer id -> (alias, hostname and tags it was built from, folded search text)
+final _haystacks = <String, (String, String)>{};
+
+/// The peer's folded search text, rebuilt only when its alias, hostname or tags change.
+String goTechHaystackOf(Peer p) {
+  final tags = p.tags.map((e) => e.toString()).toList();
+  final source = '${p.alias}\n${p.hostname}\n${tags.join('\n')}';
+  final cached = _haystacks[p.id];
+  if (cached != null && cached.$1 == source) return cached.$2;
+  final haystack = goTechHaystack(
+      id: p.id, alias: p.alias, hostname: p.hostname, tags: tags);
+  _haystacks[p.id] = (source, haystack);
+  return haystack;
+}
+
 GoTechPeerInfo goTechPeerInfo(Peer p, {bool recent = false}) => GoTechPeerInfo(
       id: p.id,
       alias: p.alias,
@@ -27,11 +42,12 @@ GoTechPeerInfo goTechPeerInfo(Peer p, {bool recent = false}) => GoTechPeerInfo(
       online: p.online,
       recent: recent,
       lastSeen: p.lastSeen,
+      haystack: goTechHaystackOf(p),
     );
 
 /// The GoTech search rule on a [Peer]; the toolbar search and the connect field both use it.
-bool goTechPeerMatches(String query, Peer p) =>
-    goTechPeerInfo(p).matches(query);
+bool goTechPeerMatches(GoTechQuery query, Peer p) =>
+    query.matches(id: p.id, haystack: goTechHaystackOf(p));
 
 Widget goTechPlatformIcon(BuildContext context, String platform) =>
     ColorFiltered(

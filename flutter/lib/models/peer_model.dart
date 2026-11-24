@@ -73,7 +73,8 @@ class Peer {
     };
   }
 
-  Map<String, dynamic> toCustomJson({required bool includingHash}) {
+  Map<String, dynamic> toCustomJson(
+      {required bool includingHash, bool includingLastSeen = false}) {
     var res = <String, dynamic>{
       "id": id,
       "username": username,
@@ -84,6 +85,10 @@ class Peer {
     };
     if (includingHash) {
       res['hash'] = hash;
+    }
+    // only the local address book cache keeps it; the panel owns the value
+    if (includingLastSeen && lastSeen != null) {
+      res['last_seen'] = lastSeen!.toIso8601String();
     }
     return res;
   }
